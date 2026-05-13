@@ -1,0 +1,22 @@
+# Backend (Maven)
+backend/target/
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/*.iml
+backend/.idea/
+
+# Frontend (Angular)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/.idea/
+frontend/*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

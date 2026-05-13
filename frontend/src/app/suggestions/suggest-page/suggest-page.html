@@ -1,0 +1,403 @@
+<section class="page">
+  <header class="page__header">
+    <h1>What should we play?</h1>
+  </header>
+
+  <div class="card">
+    <div class="form">
+      <div class="presets">
+        <span class="presets__label">Presets</span>
+        @for (preset of presets; track preset.label) {
+          <button type="button" class="preset-btn" (click)="applyPreset(preset.draft)">{{ preset.label }}</button>
+        }
+      </div>
+
+      <div class="form__top">
+        <button
+          type="button"
+          class="favorites-toggle"
+          [class.active]="draft().favoritesOnly"
+          (click)="draft.update(d => ({ ...d, favoritesOnly: !d.favoritesOnly }))"
+        >{{ draft().favoritesOnly ? '★ Favorites only' : '☆ Favorites only' }}</button>
+        <button
+          type="button"
+          class="favorites-toggle"
+          [class.active]="draft().unplayedOnly"
+          (click)="draft.update(d => ({ ...d, unplayedOnly: !d.unplayedOnly }))"
+        >{{ draft().unplayedOnly ? '● Unplayed only' : '○ Unplayed only' }}</button>
+      </div>
+
+      <div class="grid">
+
+        <div class="field field--wide">
+          <span>
+            Players *
+            @if (draft().minPlayers != null) {
+              <span class="field__value">{{ draft().minPlayers === PLAYERS_UNLIMITED ? '10+' : draft().minPlayers }}</span>
+            } @else {
+              <span class="field__optional">required</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Player count">
+            @for (n of playerOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isPlayerSelected(n)"
+                (click)="onPlayerClick(n)"
+              >{{ n === PLAYERS_UNLIMITED ? '10+' : n }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Play time
+            @if (draft().maxMinutes != null) {
+              <span class="field__value">up to {{ draft().maxMinutes === TIME_UNLIMITED ? '4h+' : formatTime(draft().maxMinutes!) }}</span>
+            } @else {
+              <span class="field__optional">any</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Play time">
+            @for (t of timeOptions; track t) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isTimeSelected(t)"
+                (click)="onTimeClick(t)"
+              >{{ t === TIME_UNLIMITED ? '4h+' : formatTime(t) }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Complexity
+            @if (draft().minComplexity != null) {
+              <span class="field__value">
+                @if (draft().minComplexity === draft().maxComplexity) {
+                  {{ complexityLabels[draft().minComplexity!] }}
+                } @else {
+                  {{ complexityLabels[draft().minComplexity!] }} – {{ complexityLabels[draft().maxComplexity!] }}
+                }
+              </span>
+            } @else {
+              <span class="field__optional">any</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Complexity">
+            @for (n of complexityOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isComplexitySelected(n)"
+                [class.in-range]="isComplexityInRange(n)"
+                [class.range-start]="n === draft().minComplexity"
+                [class.range-end]="n === draft().maxComplexity"
+                [title]="complexityLabels[n]"
+                (click)="onComplexityClick(n)"
+              >{{ n }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Max plays
+            @if (draft().maxPlayCount != null) {
+              <span class="field__value">played ≤ {{ draft().maxPlayCount }}×</span>
+            } @else {
+              <span class="field__optional">any</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Max play count">
+            @for (n of playCountOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isPlayCountSelected(n)"
+                [title]="'Played ' + n + ' time' + (n === 1 ? '' : 's') + ' or fewer'"
+                (click)="onPlayCountClick(n)"
+              >{{ n }}×</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Min rating
+            @if (draft().minRating != null) {
+              <span class="field__value">{{ draft().minRating }}+ / 10</span>
+            } @else {
+              <span class="field__optional">any</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Minimum personal rating">
+            @for (n of ratingOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isRatingSelected(n)"
+                [title]="'Rated ' + n + ' or higher'"
+                (click)="onRatingClick(n)"
+              >{{ n }}</button>
+            }
+          </div>
+        </div>
+
+        @if (allSeriesNames().length > 0) {
+          <div class="field field--wide">
+            <span>
+              Series
+              <span class="field__optional">optional — any match</span>
+            </span>
+            <div class="category-grid">
+              @for (name of sortedSeries(); track name) {
+                <button
+                  type="button"
+                  class="category-chip"
+                  [class.selected]="(draft().series ?? []).includes(name)"
+                  [class.stale]="staleSeriesNames().has(name)"
+                  [title]="staleSeriesNames().has(name) ? 'No games in this series match your current criteria' : name"
+                  (click)="toggleSeries(name)"
+                >{{ name }}</button>
+              }
+            </div>
+          </div>
+        }
+
+        <div class="field field--wide">
+          <span>
+            Categories
+            <span class="field__optional">optional — any match</span>
+          </span>
+          <div class="category-grid">
+            @for (cat of sortedCategories(); track cat.name) {
+              <button
+                type="button"
+                class="category-chip"
+                [class.selected]="(draft().categories ?? []).includes(cat.name)"
+                [class.stale]="staleCategoryNames().has(cat.name)"
+                [class.custom]="isCustomCategory(cat.name)"
+                [title]="staleCategoryNames().has(cat.name) ? 'No games match your current criteria with this category' : isCustomCategory(cat.name) ? 'Custom category from your collection' : cat.description"
+                (click)="toggleCategory(cat.name)"
+              >{{ cat.name }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Mechanics
+            <span class="field__optional">optional — any match</span>
+          </span>
+          <div class="category-grid">
+            @for (m of sortedMechanics(); track m.name) {
+              <button
+                type="button"
+                class="category-chip"
+                [class.selected]="(draft().mechanics ?? []).includes(m.name)"
+                [class.stale]="staleMechanicNames().has(m.name)"
+                [class.custom]="isCustomMechanic(m.name)"
+                [title]="staleMechanicNames().has(m.name) ? 'No games match your current criteria with this mechanic' : isCustomMechanic(m.name) ? 'Custom mechanic from your collection' : m.description"
+                (click)="toggleMechanic(m.name)"
+              >{{ m.name }}</button>
+            }
+          </div>
+        </div>
+
+      </div>
+
+      @if (error()) {
+        <div class="alert alert--error" role="alert">{{ error() }}</div>
+      }
+
+      <footer class="form__footer">
+        <button type="button" class="btn btn--ghost" (click)="reset()" [disabled]="loading()">Reset</button>
+        <button type="button" class="btn btn--primary" [disabled]="loading()" (click)="submit()">
+          @if (loading()) { Finding… } @else { Suggest }
+        </button>
+      </footer>
+    </div>
+  </div>
+
+  @if (results().length > 0 || totalCount() > 0) {
+    <div class="card">
+      <h2>
+        Results
+        <span class="muted">({{ results().length }}{{ hasMore() ? ' of ' + totalCount() : '' }})</span>
+      </h2>
+
+      @if (!hasResults()) {
+        <p class="muted">
+          Nothing in your collection fits. Try loosening the criteria — drop the time cap,
+          widen the complexity range, or remove a category.
+        </p>
+      } @else {
+        <ol class="suggestions">
+          @for (sg of results(); track sg.game.id) {
+            <li class="suggestion">
+              <div class="suggestion__rank">{{ $index + 1 }}</div>
+              <div class="suggestion__body">
+                <div class="suggestion__title-row">
+                  <h3 class="suggestion__title">
+                    <button type="button" class="title-btn" (click)="openDetail(sg.game)">{{ sg.game.title }}</button>
+                  </h3>
+                  <span class="suggestion__score" title="Suggestion score">{{ sg.score | number:'1.1-1' }}</span>
+                </div>
+                <div class="suggestion__meta muted">
+                  {{ sg.game.minPlayers }}–{{ sg.game.maxPlayers }} players ·
+                  {{ sg.game.minPlayTimeMinutes }}–{{ sg.game.maxPlayTimeMinutes }} min
+                  @if (sg.game.complexityWeight != null) {
+                    · weight {{ sg.game.complexityWeight | number:'1.1-2' }}
+                  }
+                  @if (sg.game.personalRating != null) {
+                    · rated {{ sg.game.personalRating }}/10
+                  }
+                </div>
+                @if (sg.reasons.length > 0) {
+                  <ul class="suggestion__reasons">
+                    @for (reason of sg.reasons; track reason) {
+                      <li>{{ reason }}</li>
+                    }
+                  </ul>
+                }
+                <div class="suggestion__actions">
+                  <button
+                    type="button"
+                    class="btn btn--sm"
+                    [class.btn--logged]="loggedIds().has(sg.game.id!)"
+                    [class.btn--ghost]="!loggedIds().has(sg.game.id!)"
+                    [disabled]="loggedIds().has(sg.game.id!)"
+                    (click)="logPlay(sg.game)"
+                  >{{ loggedIds().has(sg.game.id!) ? '✓ Logged!' : 'Log play' }}</button>
+                </div>
+              </div>
+            </li>
+          }
+        </ol>
+        @if (hasMore()) {
+          <div class="show-more">
+            <button type="button" class="btn btn--ghost" [disabled]="loadingMore()" (click)="showMore()">
+              @if (loadingMore()) { Loading… } @else { Show 10 more ({{ totalCount() - results().length }} remaining) }
+            </button>
+          </div>
+        }
+      }
+    </div>
+  }
+  <dialog #detailDialog class="modal modal--detail" (click)="$event.target === $event.currentTarget && closeDetail()">
+    @if (selectedGame(); as game) {
+      <div class="modal__content">
+        <header class="modal__header">
+          <h2>{{ game.title }}</h2>
+          <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
+        </header>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Players</span>
+            <span class="detail-value">
+              @if (game.minPlayers === game.maxPlayers) {
+                {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
+              } @else {
+                {{ game.minPlayers }}–{{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.maxPlayers }}
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Play Time</span>
+            <span class="detail-value">
+              @if (game.minPlayTimeMinutes === game.maxPlayTimeMinutes) {
+                {{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.minPlayTimeMinutes) }}
+              } @else {
+                {{ formatTime(game.minPlayTimeMinutes) }}–{{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.maxPlayTimeMinutes) }}
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Complexity</span>
+            <span class="detail-value">{{ game.complexityWeight != null ? game.complexityWeight.toFixed(1) + ' / 5' : '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Personal Rating</span>
+            <span class="detail-value">{{ game.personalRating != null ? game.personalRating + ' / 10' : '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Times Played</span>
+            <span class="detail-value">{{ game.playCount ?? 0 }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Last Played</span>
+            <span class="detail-value">{{ game.lastPlayedAt ? formatDate(game.lastPlayedAt) : 'Never' }}</span>
+          </div>
+        </div>
+
+        @if (game.categories.length) {
+          <div class="detail-section">
+            <span class="detail-label">Categories</span>
+            <div class="tag-list">
+              @for (cat of game.categories; track cat) {
+                <span class="tag">{{ cat }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (game.mechanics.length) {
+          <div class="detail-section">
+            <span class="detail-label">Mechanics</span>
+            <div class="tag-list">
+              @for (mec of game.mechanics; track mec) {
+                <span class="tag">{{ mec }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (game.seriesName) {
+          <div class="detail-section">
+            <span class="detail-label">Series</span>
+            <p class="detail-value">{{ game.seriesName }}</p>
+          </div>
+        }
+
+        @if (game.notes) {
+          <div class="detail-section">
+            <span class="detail-label">Notes</span>
+            <p class="detail-notes">{{ game.notes }}</p>
+          </div>
+        }
+
+        <div class="detail-section">
+          <span class="detail-label">Play History</span>
+          @if (historyLoading()) {
+            <p class="muted">Loading…</p>
+          } @else if (playHistory().length === 0) {
+            <p class="muted">No plays recorded yet.</p>
+          } @else {
+            <ol class="play-history">
+              @for (play of playHistory(); track play.id) {
+                <li>{{ formatDate(play.playedAt) }}</li>
+              }
+            </ol>
+          }
+        </div>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--ghost" (click)="closeDetail()">Close</button>
+          <button
+            type="button"
+            class="btn"
+            [class.btn--logged]="loggedIds().has(game.id!)"
+            [class.btn--ghost]="!loggedIds().has(game.id!)"
+            [disabled]="loggedIds().has(game.id!)"
+            (click)="logPlay(game)"
+          >{{ loggedIds().has(game.id!) ? '✓ Logged!' : 'Log play' }}</button>
+          <a [routerLink]="['/games', game.id, 'edit']" class="btn btn--primary" (click)="closeDetail()">Edit</a>
+        </footer>
+      </div>
+    }
+  </dialog>
+</section>

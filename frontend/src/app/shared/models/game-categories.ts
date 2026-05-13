@@ -1,0 +1,42 @@
+export interface GameTag {
+  name: string;
+  description: string;
+}
+
+export const GAME_CATEGORIES: GameTag[] = [
+  { name: 'Strategy', description: 'Long-term planning and decision-making are central to winning' },
+  { name: 'Family', description: 'Accessible to players of all ages, simple rules, low complexity' },
+  { name: 'Card Game', description: 'The primary component and mechanic involves cards' },
+  { name: 'Party', description: 'Designed for large groups, fast-paced and highly social' },
+  { name: 'Abstract', description: 'No theme — pure strategy with perfect information (e.g. Chess, Go)' },
+  { name: 'Cooperative', description: 'All players work together toward a shared goal' },
+  { name: 'Economic', description: 'Core loop involves earning, spending, and managing money or resources' },
+  { name: 'Deck Building', description: 'Players start with a basic deck and acquire better cards over the game' },
+  { name: 'Deduction', description: 'Players gather clues to figure out hidden information' },
+  { name: 'Dice Game', description: 'Dice are the primary component driving outcomes' },
+  { name: 'Tile Game', description: 'Players place tiles to build the board or score points' },
+  { name: 'Fantasy', description: 'Set in a magical world with creatures, spells, and heroes' },
+  { name: 'Wargame', description: 'Simulates military conflict, often with complex rules' },
+  { name: 'Medieval', description: 'Set in the Middle Ages — castles, knights, and feudal society' },
+  { name: 'Science Fiction', description: 'Set in a futuristic or space-based world' },
+  { name: 'World War II', description: 'Simulates battles or strategy from the Second World War' },
+  { name: 'Bluffing', description: 'Players deceive others about their intentions or holdings' },
+  { name: 'Social Deduction', description: 'Players try to identify hidden roles or traitors among the group' },
+  { name: 'Hidden Roles', description: 'Each player has a secret role that affects their goal' },
+  { name: 'Dungeon Crawler', description: 'Players explore a dungeon, fight monsters, and find loot' },
+  { name: 'Negotiation', description: 'Players make deals and agreements with each other' },
+  { name: 'Children\'s', description: 'Designed specifically for young children with very simple rules' },
+  { name: 'Puzzle', description: 'Players solve a physical or logical puzzle to win' },
+  { name: 'Roll & Write', description: 'Players roll dice and record results on a personal scoresheet' },
+  { name: 'Horror', description: 'Dark theme involving fear, monsters, or survival' },
+  { name: 'Ancient', description: 'Set in antiquity — Egypt, Greece, Rome, or other ancient civilizations' },
+  { name: 'Trivia', description: 'Players answer factual questions to score points' },
+  { name: 'Word', description: 'Players form or guess words to score points' },
+  { name: 'Space', description: 'Set in outer space, often involving exploration or combat' },
+  { name: 'Humor', description: 'The game is primarily designed to be funny and lighthearted' },
+  { name: 'Mythology', description: 'Themed around gods and legends from ancient mythologies' },
+  { name: 'Pirates', description: 'Themed around pirates, treasure, and the high seas' },
+  { name: 'Miniatures', description: 'Features detailed plastic miniatures as the primary game pieces' },
+  { name: 'Western', description: 'Set in the American frontier or Wild West' },
+  { name: 'Modern Warfare', description: 'Simulates contemporary or near-future military conflict' },
+];

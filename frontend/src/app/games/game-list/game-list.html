@@ -1,0 +1,274 @@
+<section class="page">
+  <header class="page__header">
+    <h1>Collection</h1>
+    <div class="page__actions">
+      <button type="button" class="btn btn--ghost" (click)="refresh()" [disabled]="loading()">
+        Refresh
+      </button>
+      <a routerLink="/games/add" class="btn btn--primary">Add game</a>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error" role="alert">{{ error() }}</div>
+  }
+
+  <div class="card">
+    <div class="card__header">
+      <h2>
+        Games
+        @if (searchTerm().trim()) {
+          ({{ filteredGames().length }} of {{ games().length }})
+        } @else {
+          ({{ games().length }})
+        }
+      </h2>
+      <div class="card__controls">
+        <div class="sort-wrapper">
+          <button
+            type="button"
+            class="btn btn--ghost btn--icon sort-btn"
+            [class.active]="sortKey() !== 'title-asc'"
+            title="Sort"
+            (click)="sortOpen.set(!sortOpen())"
+          >⇅</button>
+          @if (sortOpen()) {
+            <div class="sort-dropdown">
+              @for (opt of sortOptions; track opt.key) {
+                <button
+                  type="button"
+                  class="sort-option"
+                  [class.selected]="sortKey() === opt.key"
+                  (click)="selectSort(opt.key)"
+                >{{ opt.label }}</button>
+              }
+            </div>
+          }
+        </div>
+      <div class="search">
+        <input
+          type="search"
+          name="search"
+          class="search__input"
+          placeholder="Search title, players, time…"
+          aria-label="Search games"
+          [ngModel]="searchTerm()"
+          (ngModelChange)="searchTerm.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        @if (searchTerm()) {
+          <button
+            type="button"
+            class="search__clear"
+            aria-label="Clear search"
+            (click)="searchTerm.set('')"
+          >×</button>
+        }
+      </div>
+      </div>
+    </div>
+
+    @if (loading()) {
+      <p class="muted">Loading…</p>
+    } @else if (games().length === 0) {
+      <p class="muted">No games yet — click "Add game" to add your first one.</p>
+    } @else if (filteredGames().length === 0) {
+      <p class="muted">No games match "{{ searchTerm() }}".</p>
+    } @else {
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="th-title"><span class="star-spacer" aria-hidden="true"></span>Title</th>
+            <th>Players</th>
+            <th>Average Game Time</th>
+            <th>Complexity</th>
+            <th>Plays</th>
+            <th>Last Played</th>
+            <th>Personal Rating</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (game of filteredGames(); track game.id) {
+            <tr>
+              <td class="title-cell">
+                <button
+                  type="button"
+                  class="btn btn--icon star-btn"
+                  [class.active]="game.favorite"
+                  [title]="game.favorite ? 'Remove from favorites' : 'Add to favorites'"
+                  (click)="toggleFavorite(game)"
+                >{{ game.favorite ? '★' : '☆' }}</button>
+                <button type="button" class="title-btn" (click)="openDetail(game)">{{ game.title }}</button>
+              </td>
+              <td>
+                @if (game.minPlayers === game.maxPlayers) {
+                  {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
+                } @else {
+                  {{ game.minPlayers }}–{{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.maxPlayers }}
+                }
+              </td>
+              <td>
+                @if (game.minPlayTimeMinutes === game.maxPlayTimeMinutes) {
+                  {{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.minPlayTimeMinutes) }}
+                } @else {
+                  {{ formatTime(game.minPlayTimeMinutes) }}–{{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.maxPlayTimeMinutes) }}
+                }
+              </td>
+              <td>{{ game.complexityWeight != null ? game.complexityWeight.toFixed(1) : '—' }}</td>
+              <td class="plays-cell">{{ game.playCount ?? 0 }}</td>
+              <td>{{ game.lastPlayedAt ? formatDate(game.lastPlayedAt) : 'Never' }}</td>
+              <td>{{ game.personalRating ?? '—' }}</td>
+              <td class="row-actions">
+                <button
+                  type="button"
+                  class="btn btn--icon"
+                  [class.btn--logged-icon]="loggedIds().has(game.id!)"
+                  [disabled]="loggedIds().has(game.id!)"
+                  [title]="loggedIds().has(game.id!) ? 'Logged!' : 'Log play'"
+                  (click)="logPlay(game)"
+                >{{ loggedIds().has(game.id!) ? '✓' : '▶️' }}</button>
+                <a [routerLink]="['/games', game.id, 'edit']" class="btn btn--icon" title="Edit">✏️</a>
+                <button type="button" class="btn btn--icon btn--icon-danger" title="Delete" (click)="confirmDelete(game)">🗑️</button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+  <dialog #detailDialog class="modal modal--detail" (click)="$event.target === $event.currentTarget && closeDetail()">
+    @if (selectedGame(); as game) {
+      <div class="modal__content">
+        <header class="modal__header">
+          <h2>{{ game.title }}</h2>
+          <div class="modal__header-actions">
+            <button
+              type="button"
+              class="btn btn--star"
+              [class.active]="game.favorite"
+              [title]="game.favorite ? 'Remove from favorites' : 'Add to favorites'"
+              (click)="toggleFavorite(game)"
+            >{{ game.favorite ? '★' : '☆' }}</button>
+            <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
+          </div>
+        </header>
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Players</span>
+            <span class="detail-value">
+              @if (game.minPlayers === game.maxPlayers) {
+                {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
+              } @else {
+                {{ game.minPlayers }}–{{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.maxPlayers }}
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Play Time</span>
+            <span class="detail-value">
+              @if (game.minPlayTimeMinutes === game.maxPlayTimeMinutes) {
+                {{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.minPlayTimeMinutes) }}
+              } @else {
+                {{ formatTime(game.minPlayTimeMinutes) }}–{{ game.maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(game.maxPlayTimeMinutes) }}
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Complexity</span>
+            <span class="detail-value">{{ game.complexityWeight != null ? game.complexityWeight.toFixed(1) + ' / 5' : '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Personal Rating</span>
+            <span class="detail-value">{{ game.personalRating != null ? game.personalRating + ' / 10' : '—' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Times Played</span>
+            <span class="detail-value">{{ game.playCount ?? 0 }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Last Played</span>
+            <span class="detail-value">{{ game.lastPlayedAt ? formatDate(game.lastPlayedAt) : 'Never' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Owned Since</span>
+            <span class="detail-value">{{ game.ownedSince ? formatDate(game.ownedSince) : '—' }}</span>
+          </div>
+          @if (game.seriesName) {
+            <div class="detail-item">
+              <span class="detail-label">Series</span>
+              <span class="detail-value">{{ game.seriesName }}</span>
+            </div>
+          }
+        </div>
+
+        @if (game.categories.length) {
+          <div class="detail-section">
+            <span class="detail-label">Categories</span>
+            <div class="tag-list">
+              @for (cat of game.categories; track cat) {
+                <span class="tag">{{ cat }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (game.mechanics.length) {
+          <div class="detail-section">
+            <span class="detail-label">Mechanics</span>
+            <div class="tag-list">
+              @for (mec of game.mechanics; track mec) {
+                <span class="tag">{{ mec }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (game.notes) {
+          <div class="detail-section">
+            <span class="detail-label">Notes</span>
+            <p class="detail-notes">{{ game.notes }}</p>
+          </div>
+        }
+
+        <div class="detail-section">
+          <span class="detail-label">Play History</span>
+          @if (historyLoading()) {
+            <p class="muted">Loading…</p>
+          } @else if (playHistory().length === 0) {
+            <p class="muted">No plays recorded yet.</p>
+          } @else {
+            <ol class="play-history">
+              @for (play of playHistory(); track play.id) {
+                <li>{{ formatDate(play.playedAt) }}</li>
+              }
+            </ol>
+          }
+        </div>
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--ghost" (click)="closeDetail()">Close</button>
+          <a [routerLink]="['/games', game.id, 'edit']" class="btn btn--primary" (click)="closeDetail()">Edit</a>
+        </footer>
+      </div>
+    }
+  </dialog>
+
+  <dialog #deleteDialog class="modal">
+    <div class="modal__content">
+      <header class="modal__header">
+        <h2>Delete game?</h2>
+        <button type="button" class="modal__close" aria-label="Close" (click)="cancelDelete()">×</button>
+      </header>
+      <p class="delete-confirm__message">
+        Are you sure you want to delete <strong>{{ gameToDelete()?.title }}</strong>? This cannot be undone.
+      </p>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--ghost" (click)="cancelDelete()">Cancel</button>
+        <button type="button" class="btn btn--danger" (click)="executeDelete()">Delete</button>
+      </footer>
+    </div>
+  </dialog>
+</section>

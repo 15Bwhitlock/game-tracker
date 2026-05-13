@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items termsofuse="https://boardgamegeek.com/xmlapi/termsofuse">
+    <item type="boardgame" id="987654">
+        <name type="primary" sortindex="1" value="Obscure Game"/>
+        <minplayers value="2"/>
+        <maxplayers value="4"/>
+        <minplaytime value="30"/>
+        <maxplaytime value="45"/>
+        <statistics page="1">
+            <ratings>
+                <averageweight value="0"/>
+            </ratings>
+        </statistics>
+    </item>
+</items>

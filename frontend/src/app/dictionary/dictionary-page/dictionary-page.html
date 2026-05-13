@@ -1,0 +1,136 @@
+<section class="page">
+  <header class="page__header">
+    <h1>Dictionary</h1>
+    <div class="search">
+      <input
+        type="search"
+        class="search__input"
+        placeholder="Search categories, mechanics, glossary…"
+        aria-label="Search dictionary"
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
+        [ngModelOptions]="{ standalone: true }"
+      />
+      @if (searchTerm()) {
+        <button type="button" class="search__clear" aria-label="Clear search" (click)="searchTerm.set('')">×</button>
+      }
+    </div>
+  </header>
+
+  <!-- Complexity Scale -->
+  @if (!searchTerm()) {
+    <div class="card">
+      <h2 class="section-title">Complexity Scale</h2>
+      <p class="section-subtitle">Based on BGG's weight rating (1–5). Use this when deciding what to play with a given group.</p>
+      <div class="complexity-grid">
+        @for (level of complexityLevels; track level.value) {
+          <div class="complexity-card complexity-card--{{ level.value }}">
+            <div class="complexity-card__header">
+              <span class="complexity-card__badge">{{ level.value }}</span>
+              <span class="complexity-card__label">{{ level.label }}</span>
+              <span class="complexity-card__range">BGG {{ level.bggRange }}</span>
+            </div>
+            <p class="complexity-card__desc">{{ level.description }}</p>
+            <p class="complexity-card__examples"><strong>Examples:</strong> {{ level.examples }}</p>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Player Count Reference -->
+    <div class="card">
+      <h2 class="section-title">Player Count Guide</h2>
+      <p class="section-subtitle">What different player counts mean for game selection and experience.</p>
+      <div class="entry-list">
+        @for (tip of playerCountTips; track tip.count) {
+          <div class="entry">
+            <span class="entry__name">{{ tip.count }}</span>
+            <span class="entry__desc">{{ tip.description }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Play Time Reference -->
+    <div class="card">
+      <h2 class="section-title">Play Time Guide</h2>
+      <p class="section-subtitle">What different session lengths mean in practice.</p>
+      <div class="entry-list">
+        @for (tip of playTimeTips; track tip.range) {
+          <div class="entry">
+            <span class="entry__name">{{ tip.range }}</span>
+            <span class="entry__desc">{{ tip.description }}</span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- Personal Rating Scale -->
+    <div class="card">
+      <h2 class="section-title">Personal Rating Scale</h2>
+      <p class="section-subtitle">What your 1–10 ratings mean — a guide to stay consistent over time.</p>
+      <div class="entry-list">
+        @for (tip of ratingScale; track tip.value) {
+          <div class="entry entry--rating">
+            <span class="entry__name entry__name--rating">{{ tip.value }} / 10</span>
+            <span class="entry__desc">{{ tip.description }}</span>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <!-- Glossary -->
+  <div class="card">
+    <h2 class="section-title">Glossary</h2>
+    <p class="section-subtitle">Common board game terms and hobby jargon.</p>
+    @if (filteredGlossary().length === 0) {
+      <p class="muted">No glossary terms match "{{ searchTerm() }}".</p>
+    } @else {
+      <div class="entry-list">
+        @for (g of filteredGlossary(); track g.term) {
+          <div class="entry">
+            <span class="entry__name">{{ g.term }}</span>
+            <span class="entry__desc">{{ g.definition }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Categories -->
+  <div class="card">
+    <h2 class="section-title">Categories</h2>
+    <p class="section-subtitle">What the game is about — its theme, setting, or audience.</p>
+    @if (filteredCategories().length === 0) {
+      <p class="muted">No categories match "{{ searchTerm() }}".</p>
+    } @else {
+      <div class="entry-list">
+        @for (cat of filteredCategories(); track cat.name) {
+          <div class="entry">
+            <span class="entry__name">{{ cat.name }}</span>
+            <span class="entry__desc">{{ cat.description }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- Mechanics -->
+  <div class="card">
+    <h2 class="section-title">Mechanics</h2>
+    <p class="section-subtitle">How the game is played — the verbs of what players actually do.</p>
+    @if (filteredMechanics().length === 0) {
+      <p class="muted">No mechanics match "{{ searchTerm() }}".</p>
+    } @else {
+      <div class="entry-list">
+        @for (m of filteredMechanics(); track m.name) {
+          <div class="entry">
+            <span class="entry__name">{{ m.name }}</span>
+            <span class="entry__desc">{{ m.description }}</span>
+          </div>
+        }
+      </div>
+    }
+  </div>
+</section>

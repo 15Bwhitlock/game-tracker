@@ -1,0 +1,515 @@
+<section class="page">
+  <header class="page__header">
+    <h1>{{ editId() ? 'Edit Game' : 'Add Game' }}</h1>
+    <button type="button" class="btn btn--ghost" (click)="cancel()" [disabled]="saving()">
+      Cancel
+    </button>
+  </header>
+
+  @if (formError()) {
+    <div class="alert alert--error" role="alert">{{ formError() }}</div>
+  }
+
+  <div class="card">
+    @if (loading()) {
+      <p class="muted">Loading…</p>
+    }
+    <form class="form" (ngSubmit)="save()">
+      <p class="required-note"><span class="required-star">*</span> Required</p>
+      <div class="grid">
+        <label class="field field--wide">
+          <span>Title <span class="required-star">*</span></span>
+          <input
+            name="title"
+            type="text"
+            autofocus
+            [ngModel]="draft().title"
+            (ngModelChange)="onTitleChange($event)"
+            (blur)="onTitleBlur()"
+            placeholder="Game Title"
+            required
+          />
+        </label>
+
+        @if (showDuplicateWarning()) {
+          <div class="duplicate-warning field--wide">
+            <p class="duplicate-warning__text">
+              <strong>⚠ You may already own this.</strong>
+              "{{ duplicateGame()?.title }}" is already in your collection.
+            </p>
+            <div class="duplicate-warning__actions">
+              <a
+                [href]="'/games/' + duplicateGame()?.id + '/edit'"
+                target="_blank"
+                rel="noopener"
+                class="btn btn--ghost btn--sm"
+              >View it</a>
+              <button type="button" class="btn btn--ghost btn--sm" (click)="dismissDuplicateWarning()">Dismiss</button>
+            </div>
+          </div>
+        }
+
+        @if (showSeriesSuggestion()) {
+          <div class="series-hint field--wide">
+            <p class="series-hint__text">
+              Looks related to <strong>{{ seriesMatchGame()?.title }}</strong> in your collection.
+              Add both to a series?
+            </p>
+            <div class="series-hint__row">
+              <input
+                type="text"
+                class="series-hint__name-input"
+                [ngModel]="seriesSuggestionName()"
+                (ngModelChange)="seriesSuggestionName.set($event)"
+                [ngModelOptions]="{ standalone: true }"
+                placeholder="Series name"
+                aria-label="Series name"
+              />
+              <button type="button" class="btn btn--primary btn--sm" (click)="acceptSeriesSuggestion()">Yes</button>
+              <button type="button" class="btn btn--ghost btn--sm" (click)="dismissSeriesSuggestion()">Dismiss</button>
+            </div>
+          </div>
+        }
+
+        <label class="field field--wide">
+          <span>
+            Series name
+            <span class="field__optional">optional</span>
+          </span>
+          <input
+            name="seriesName"
+            type="text"
+            [ngModel]="draft().seriesName"
+            (ngModelChange)="draft.update(d => ({ ...d, seriesName: $event || null }))"
+            placeholder="e.g. Fluxx, Pandemic"
+          />
+        </label>
+
+        <div class="field field--wide">
+          <span>
+            Players <span class="required-star">*</span>
+            @if (draft().minPlayers !== null) {
+              <span class="field__value">
+                @if (draft().minPlayers === draft().maxPlayers) {
+                  {{ draft().maxPlayers === PLAYERS_UNLIMITED ? '10+' : draft().minPlayers }}
+                } @else {
+                  {{ draft().minPlayers }}–{{ draft().maxPlayers === PLAYERS_UNLIMITED ? '10+' : draft().maxPlayers }}
+                }
+              </span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Player count">
+            @for (n of playerOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isPlayerSelected(n)"
+                [class.in-range]="isPlayerInRange(n)"
+                [class.range-start]="n === draft().minPlayers"
+                [class.range-end]="n === draft().maxPlayers"
+                (click)="onPlayerClick(n)"
+              >{{ n === PLAYERS_UNLIMITED ? '10+' : n }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Play time <span class="required-star">*</span>
+            @if (draft().minPlayTimeMinutes !== null) {
+              <span class="field__value">
+                @if (draft().minPlayTimeMinutes === draft().maxPlayTimeMinutes) {
+                  {{ draft().maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(draft().minPlayTimeMinutes) }}
+                } @else {
+                  {{ formatTime(draft().minPlayTimeMinutes) }}–{{ draft().maxPlayTimeMinutes === TIME_UNLIMITED ? '4h+' : formatTime(draft().maxPlayTimeMinutes) }}
+                }
+              </span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Play time">
+            @for (t of timeOptions; track t) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="isTimeSelected(t)"
+                [class.in-range]="isTimeInRange(t)"
+                [class.range-start]="t === draft().minPlayTimeMinutes"
+                [class.range-end]="t === draft().maxPlayTimeMinutes"
+                (click)="onTimeClick(t)"
+              >{{ t === TIME_UNLIMITED ? '4h+' : formatTime(t) }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Personal Rating
+            @if (draft().personalRating !== null) {
+              <span class="field__value">{{ draft().personalRating }}/10</span>
+            } @else {
+              <span class="field__optional">optional</span>
+            }
+          </span>
+          <div class="btn-group" role="group" aria-label="Personal rating">
+            @for (r of ratingOptions; track r) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="draft().personalRating === r"
+                (click)="onRatingClick(r)"
+              >{{ r }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span class="field__label-row">
+            Complexity
+            @if (draft().complexityWeight !== null && draft().complexityWeight !== undefined) {
+              <span class="field__value">{{ complexityLabels[draft().complexityWeight!] }}</span>
+            } @else {
+              <span class="field__optional">optional</span>
+            }
+            <button type="button" class="info-btn" (click)="openComplexityInfo()" aria-label="Complexity help">?</button>
+          </span>
+          <div class="btn-group" role="group" aria-label="Complexity">
+            @for (n of complexityOptions; track n) {
+              <button
+                type="button"
+                class="btn-group__btn"
+                [class.selected]="draft().complexityWeight === n"
+                [title]="complexityLabels[n]"
+                (click)="onComplexityClick(n)"
+              >{{ n }}</button>
+            }
+          </div>
+        </div>
+
+        @if (editId()) {
+          <div class="field field--wide">
+            <span>
+              Last Played
+              <span class="field__optional">optional</span>
+            </span>
+            <input
+              type="date"
+              name="lastPlayedAt"
+              [ngModel]="draft().lastPlayedAt"
+              (ngModelChange)="draft.update(d => ({ ...d, lastPlayedAt: $event || null }))"
+            />
+          </div>
+          <div class="field field--wide">
+            <span>Play History</span>
+            @if (historyLoading()) {
+              <p class="muted">Loading…</p>
+            } @else if (playHistory().length === 0) {
+              <p class="muted">No plays recorded.</p>
+            } @else {
+              <ul class="play-history-list">
+                @for (entry of visiblePlayHistory(); track entry.play.id) {
+                  <li class="play-history-item" [class.play-history-item--pending]="entry.pending">
+                    <span>{{ formatDate(entry.play.playedAt) }}</span>
+                    @if (entry.pending) {
+                      <span class="play-history-item__label">removed on save</span>
+                      <button
+                        type="button"
+                        class="btn--icon"
+                        title="Restore this play"
+                        (click)="restorePlay(entry.play)"
+                      >↩</button>
+                    } @else {
+                      <button
+                        type="button"
+                        class="btn--icon btn--icon-danger"
+                        title="Remove this play"
+                        (click)="removePlay(entry.play)"
+                      >✕</button>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        }
+
+        <div class="field field--wide">
+          <span class="field__label-row">
+            Categories
+            <span class="field__optional">optional</span>
+            <button type="button" class="info-btn" (click)="openCategoryInfo()" aria-label="Category help">?</button>
+          </span>
+          <div class="category-grid">
+            @for (cat of sortedCategories(); track cat.name) {
+              <button
+                type="button"
+                class="category-chip"
+                [class.selected]="draft().categories.includes(cat.name)"
+                [class.from-collection]="usedCustomCategories().includes(cat.name)"
+                [title]="cat.description"
+                (click)="toggleCategory(cat.name)"
+              >{{ cat.name }}</button>
+            }
+          </div>
+          <div class="tag-combobox">
+            <input
+              type="text"
+              placeholder="Search or add category…"
+              autocomplete="off"
+              [ngModel]="customCategoryInput()"
+              (ngModelChange)="customCategoryInput.set($event); categoryHighlightIdx.set(-1)"
+              [ngModelOptions]="{ standalone: true }"
+              (keydown)="onCustomCategoryKeydown($event)"
+              (focus)="categoryInputFocused.set(true)"
+              (blur)="categoryInputFocused.set(false)"
+            />
+            @if (categorySuggestionsOpen()) {
+              <ul class="tag-suggestions" role="listbox">
+                @for (s of categorySuggestions(); track s.name; let i = $index) {
+                  <li
+                    class="tag-suggestion-item"
+                    [class.highlighted]="categoryHighlightIdx() === i"
+                    [class.is-new]="s.isNew"
+                    role="option"
+                    (mousedown)="$event.preventDefault(); selectCategorySuggestion(s)"
+                  >
+                    @if (s.isNew) {
+                      <span class="tag-suggestion-add">+</span> Add "{{ s.name }}"
+                    } @else {
+                      {{ s.name }}
+                      @if (s.isFromCollection) {
+                        <span class="tag-suggestion-badge">in use</span>
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          @if (draft().categories.some(c => !presetCategoryNames.includes(c))) {
+            <ul class="custom-tag-list">
+              @for (cat of draft().categories; track cat) {
+                @if (!presetCategoryNames.includes(cat)) {
+                  <li class="custom-tag-item">
+                    @if (editingCategoryTag() === cat) {
+                      <input
+                        class="custom-tag-input"
+                        type="text"
+                        [ngModel]="editingCategoryValue()"
+                        (ngModelChange)="editingCategoryValue.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                        (keydown)="onEditTagKeydown($event, 'category')"
+                      />
+                      <button type="button" class="btn--icon" title="Confirm" (click)="confirmEditCategory()">✓</button>
+                      <button type="button" class="btn--icon" title="Cancel" (click)="cancelEditCategory()">✕</button>
+                    } @else {
+                      <span class="custom-tag-name">{{ cat }}</span>
+                      <button type="button" class="btn--icon" title="Rename" (click)="startEditCategory(cat)">✏</button>
+                      <button type="button" class="btn--icon btn--icon-danger" title="Remove" (click)="toggleCategory(cat)">×</button>
+                    }
+                  </li>
+                }
+              }
+            </ul>
+          }
+        </div>
+        <div class="field field--wide">
+          <span class="field__label-row">
+            Mechanics
+            <span class="field__optional">optional</span>
+            <button type="button" class="info-btn" (click)="openMechanicInfo()" aria-label="Mechanics help">?</button>
+          </span>
+          <div class="category-grid">
+            @for (m of sortedMechanics(); track m.name) {
+              <button
+                type="button"
+                class="category-chip"
+                [class.selected]="draft().mechanics.includes(m.name)"
+                [class.from-collection]="usedCustomMechanics().includes(m.name)"
+                [title]="m.description"
+                (click)="toggleMechanic(m.name)"
+              >{{ m.name }}</button>
+            }
+          </div>
+          <div class="tag-combobox">
+            <input
+              type="text"
+              placeholder="Search or add mechanic…"
+              autocomplete="off"
+              [ngModel]="customMechanicInput()"
+              (ngModelChange)="customMechanicInput.set($event); mechanicHighlightIdx.set(-1)"
+              [ngModelOptions]="{ standalone: true }"
+              (keydown)="onCustomMechanicKeydown($event)"
+              (focus)="mechanicInputFocused.set(true)"
+              (blur)="mechanicInputFocused.set(false)"
+            />
+            @if (mechanicSuggestionsOpen()) {
+              <ul class="tag-suggestions" role="listbox">
+                @for (s of mechanicSuggestions(); track s.name; let i = $index) {
+                  <li
+                    class="tag-suggestion-item"
+                    [class.highlighted]="mechanicHighlightIdx() === i"
+                    [class.is-new]="s.isNew"
+                    role="option"
+                    (mousedown)="$event.preventDefault(); selectMechanicSuggestion(s)"
+                  >
+                    @if (s.isNew) {
+                      <span class="tag-suggestion-add">+</span> Add "{{ s.name }}"
+                    } @else {
+                      {{ s.name }}
+                      @if (s.isFromCollection) {
+                        <span class="tag-suggestion-badge">in use</span>
+                      }
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+          @if (draft().mechanics.some(m => !presetMechanicNames.includes(m))) {
+            <ul class="custom-tag-list">
+              @for (m of draft().mechanics; track m) {
+                @if (!presetMechanicNames.includes(m)) {
+                  <li class="custom-tag-item">
+                    @if (editingMechanicTag() === m) {
+                      <input
+                        class="custom-tag-input"
+                        type="text"
+                        [ngModel]="editingMechanicValue()"
+                        (ngModelChange)="editingMechanicValue.set($event)"
+                        [ngModelOptions]="{ standalone: true }"
+                        (keydown)="onEditTagKeydown($event, 'mechanic')"
+                      />
+                      <button type="button" class="btn--icon" title="Confirm" (click)="confirmEditMechanic()">✓</button>
+                      <button type="button" class="btn--icon" title="Cancel" (click)="cancelEditMechanic()">✕</button>
+                    } @else {
+                      <span class="custom-tag-name">{{ m }}</span>
+                      <button type="button" class="btn--icon" title="Rename" (click)="startEditMechanic(m)">✏</button>
+                      <button type="button" class="btn--icon btn--icon-danger" title="Remove" (click)="toggleMechanic(m)">×</button>
+                    }
+                  </li>
+                }
+              }
+            </ul>
+          }
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Notes
+            <span class="field__optional">optional</span>
+          </span>
+          <textarea
+            name="notes"
+            rows="3"
+            placeholder="Personal thoughts, setup tips, best configurations…"
+            [ngModel]="draft().notes"
+            (ngModelChange)="draft.update(d => ({ ...d, notes: $event || null }))"
+          ></textarea>
+        </div>
+
+      </div>
+
+      <footer class="form__footer">
+        <button type="button" class="btn btn--ghost" (click)="cancel()" [disabled]="saving()">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn--primary" [disabled]="saving()">
+          @if (saving()) { Saving… } @else { {{ editId() ? 'Save changes' : 'Save game' }} }
+        </button>
+      </footer>
+    </form>
+  </div>
+
+  <dialog #complexityInfoDialog class="modal">
+    <div class="modal__content">
+      <header class="modal__header">
+        <h2>What is complexity?</h2>
+        <button type="button" class="modal__close" aria-label="Close" (click)="closeComplexityInfo()">×</button>
+      </header>
+      <div class="info-panel">
+        <p>Complexity (BGG's "weight") rates how mentally demanding a game is, on a scale of 1–5:</p>
+        <ul>
+          <li><strong>1 — Very Light</strong>: Simple rules, minimal decisions. Great for kids or non-gamers.</li>
+          <li><strong>2 — Light</strong>: Easy to learn, a few meaningful choices. Good gateway games. <em>(e.g. Ticket to Ride, Catan)</em></li>
+          <li><strong>3 — Medium</strong>: Moderate ruleset, real strategic depth. <em>(e.g. Pandemic, 7 Wonders)</em></li>
+          <li><strong>4 — Heavy</strong>: Complex rules, long play time, deep strategy. <em>(e.g. Terraforming Mars)</em></li>
+          <li><strong>5 — Very Heavy</strong>: Steep learning curve, highly involved. <em>(e.g. Twilight Imperium)</em></li>
+        </ul>
+        <p class="info-panel__tip">Use the suggestion page to filter by complexity range — handy when you want a light game for a casual night or a brain-burner for experienced players.</p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--primary" (click)="closeComplexityInfo()">Got it</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog #mechanicInfoDialog class="modal">
+    <div class="modal__content">
+      <header class="modal__header">
+        <h2>How to find mechanics</h2>
+        <button type="button" class="modal__close" aria-label="Close" (click)="closeMechanicInfo()">×</button>
+      </header>
+      <div class="info-panel">
+        <p><strong>Ask what players spend most of their time doing:</strong></p>
+        <ul>
+          <li>Placing pieces on a board → <em>Tile Placement</em></li>
+          <li>Drawing and playing cards from a hand → <em>Hand Management</em></li>
+          <li>Rolling dice to determine outcomes → <em>Dice Rolling</em></li>
+          <li>Building up a personal card supply → <em>Deck Building</em></li>
+          <li>Sending workers to claim actions → <em>Worker Placement</em></li>
+          <li>Collecting matching sets → <em>Set Collection</em></li>
+          <li>Competing to control board regions → <em>Area Control</em></li>
+        </ul>
+        <p><strong>Look at what's in the box:</strong></p>
+        <ul>
+          <li>Lots of dice → <em>Dice Rolling</em> or <em>Push Your Luck</em></li>
+          <li>A big deck of cards → <em>Deck Building</em> or <em>Hand Management</em></li>
+          <li>Worker meeples → <em>Worker Placement</em></li>
+          <li>A map with regions → <em>Area Control</em></li>
+          <li>Hidden role cards → <em>Hidden Roles</em> or <em>Bluffing</em></li>
+        </ul>
+        <p class="info-panel__tip">Category = the <em>theme</em> (what it's about). Mechanic = the <em>verb</em> (what you do). Most games have 3–6 mechanics. Describe your turn in plain English — each verb is usually a mechanic.</p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--primary" (click)="closeMechanicInfo()">Got it</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog #categoryInfoDialog class="modal">
+    <div class="modal__content">
+      <header class="modal__header">
+        <h2>How to pick categories</h2>
+        <button type="button" class="modal__close" aria-label="Close" (click)="closeCategoryInfo()">×</button>
+      </header>
+      <div class="info-panel">
+        <p><strong>Theme</strong> — what the game is about:</p>
+        <ul>
+          <li>Castles &amp; knights → <em>Medieval</em></li>
+          <li>Spaceships &amp; aliens → <em>Science Fiction / Space</em></li>
+          <li>Dragons &amp; magic → <em>Fantasy</em></li>
+          <li>Battles &amp; armies → <em>Wargame / World War II</em></li>
+          <li>Murder mystery → <em>Deduction</em></li>
+        </ul>
+        <p><strong>Mechanism</strong> — how you play:</p>
+        <ul>
+          <li>Building a personal card deck → <em>Deck Building</em></li>
+          <li>Everyone works together → <em>Cooperative</em></li>
+          <li>One player lies, others guess → <em>Bluffing / Social Deduction</em></li>
+          <li>Placing tiles on a board → <em>Tile Game</em></li>
+          <li>Mainly rolling dice → <em>Dice Game</em></li>
+        </ul>
+        <p><strong>Audience</strong> — who it's for:</p>
+        <ul>
+          <li><em>Family</em> — accessible to all ages, low complexity</li>
+          <li><em>Party</em> — 5+ players, fast and social</li>
+          <li><em>Abstract</em> — no theme at all (Chess, Go, Othello)</li>
+        </ul>
+        <p class="info-panel__tip">Most games have 2–3 categories. Ask yourself: what's the box art about? What do players spend most of their time doing?</p>
+      </div>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--primary" (click)="closeCategoryInfo()">Got it</button>
+      </footer>
+    </div>
+  </dialog>
+</section>

@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: game-tracker
+  datasource:
+    url: jdbc:postgresql://localhost:5432/gametracker
+    username: gametracker
+    password: gametracker
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.braydenwhitlock.gametracker: DEBUG

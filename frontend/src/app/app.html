@@ -1,0 +1,19 @@
+<header class="app-header">
+  <a routerLink="/collection" class="brand">🎲 Game Tracker</a>
+  <nav>
+    <a routerLink="/collection" routerLinkActive="active">Collection</a>
+    <a routerLink="/suggest" routerLinkActive="active">Suggest</a>
+    <a routerLink="/dictionary" routerLinkActive="active">Dictionary</a>
+  </nav>
+  <button
+    type="button"
+    class="theme-toggle"
+    [title]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+    (click)="theme.toggle()"
+  >{{ theme.isDark() ? '☀️' : '🌙' }}</button>
+</header>
+
+<main>
+  <router-outlet />
+</main>
+<app-toast />

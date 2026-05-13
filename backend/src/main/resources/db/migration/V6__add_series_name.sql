@@ -1,0 +1,1 @@
+ALTER TABLE games ADD COLUMN series_name VARCHAR(255);

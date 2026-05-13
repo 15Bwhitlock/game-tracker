@@ -1,0 +1,98 @@
+:root {
+  --bg-page:            #f6f7fb;
+  --bg-card:            #ffffff;
+  --bg-surface:         #f8f9fc;
+  --bg-hover:           #f3f4f7;
+  --bg-selected:        #f0f3ff;
+  --bg-input:           #ffffff;
+  --text-primary:       #1f2330;
+  --text-secondary:     #555555;
+  --text-muted:         #777777;
+  --text-faint:         #999999;
+  --text-body:          #444444;
+  --text-dark:          #333333;
+  --border:             #e3e3e8;
+  --border-input:       #cfd1d6;
+  --border-subtle:      #ececf0;
+  --accent:             #4a6cf7;
+  --accent-hover:       #3a58d4;
+  --accent-dim:         rgba(74, 108, 247, 0.1);
+  --accent-dim-strong:  rgba(74, 108, 247, 0.12);
+  --accent-text:        #3a58d4;
+  --accent-bg:          #f0f3ff;
+  --accent-focus:       rgba(74, 108, 247, 0.15);
+  --shadow-card:        rgba(0, 0, 0, 0.04);
+  --shadow-modal:       rgba(0, 0, 0, 0.2);
+  --backdrop:           rgba(15, 18, 28, 0.45);
+  --error-bg:           #fdecec;
+  --error-text:         #8a1f1f;
+  --error-border:       #f1c1c1;
+  --success-bg:         #d6f5e3;
+  --success-border:     #4caf82;
+  --success-text:       #1a6e44;
+  --danger-border:      #d8a0a0;
+  --danger-text:        #b53b3b;
+  --danger-bg-hover:    #fdecec;
+  --star-color:         #f5c518;
+  --star-bg:            #fff8e1;
+  --star-bg-active:     #fffde7;
+}
+
+html.dark {
+  color-scheme: dark;
+  --bg-page:            #0f1117;
+  --bg-card:            #1a1d27;
+  --bg-surface:         #151820;
+  --bg-hover:           #252836;
+  --bg-selected:        #1e2544;
+  --bg-input:           #1e2130;
+  --text-primary:       #e8eaf0;
+  --text-secondary:     #a0a8c0;
+  --text-muted:         #7a8099;
+  --text-faint:         #5c6280;
+  --text-body:          #c0c4d4;
+  --text-dark:          #d0d4e4;
+  --border:             #2a2d3e;
+  --border-input:       #333649;
+  --border-subtle:      #252836;
+  --accent:             #7b97ff;
+  --accent-hover:       #6b87ef;
+  --accent-dim:         rgba(123, 151, 255, 0.15);
+  --accent-dim-strong:  rgba(123, 151, 255, 0.18);
+  --accent-text:        #8faeff;
+  --accent-bg:          #1e2544;
+  --accent-focus:       rgba(123, 151, 255, 0.2);
+  --shadow-card:        rgba(0, 0, 0, 0.25);
+  --shadow-modal:       rgba(0, 0, 0, 0.6);
+  --backdrop:           rgba(0, 0, 0, 0.65);
+  --error-bg:           #2d1414;
+  --error-text:         #f08080;
+  --error-border:       #5a2020;
+  --success-bg:         #0d2b1a;
+  --success-border:     #2d7a50;
+  --success-text:       #6dd4a0;
+  --danger-border:      #7a3535;
+  --danger-text:        #f08080;
+  --danger-bg-hover:    #2d1414;
+  --star-color:         #f5c518;
+  --star-bg:            #2a2410;
+  --star-bg-active:     #1e1c0a;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-page);
+  transition: background 0.2s, color 0.2s;
+}
+
+* { box-sizing: border-box; }
+
+a { color: var(--accent); }
+
+dialog {
+  background: var(--bg-card);
+  color: var(--text-primary);
+}

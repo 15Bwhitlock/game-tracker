@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mvn spring-boot:run)",
+      "Bash(mvn -Dtest=BggClientParseTest test)",
+      "WebSearch",
+      "Bash(mvn test *)",
+      "Bash(mvn clean *)"
+    ]
+  }
+}
