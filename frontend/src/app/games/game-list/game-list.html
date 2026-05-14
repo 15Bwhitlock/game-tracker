@@ -47,14 +47,18 @@
         </div>
       <div class="search">
         <input
-          type="search"
+          type="text"
           name="search"
           class="search__input"
-          placeholder="Search title, players, time…"
+          placeholder="Search title, categories, mechanics, notes, players, time, rating…"
           aria-label="Search games"
           [ngModel]="searchTerm()"
-          (ngModelChange)="searchTerm.set($event)"
+          (ngModelChange)="onSearchTermChange($event)"
           [ngModelOptions]="{ standalone: true }"
+          (focus)="searchFocused.set(true)"
+          (blur)="onSearchBlur()"
+          (keydown)="onSearchKeydown($event)"
+          autocomplete="off"
         />
         @if (searchTerm()) {
           <button
@@ -63,6 +67,23 @@
             aria-label="Clear search"
             (click)="searchTerm.set('')"
           >×</button>
+        }
+        @if (searchSuggestionsOpen()) {
+          <div class="search-suggestions" role="listbox">
+            @let flat = flatSuggestions();
+            @for (group of searchSuggestions(); track group.label) {
+              <div class="search-suggestions__group-label">{{ group.label }}</div>
+              @for (item of group.items; track item) {
+                <button
+                  type="button"
+                  class="search-suggestion"
+                  role="option"
+                  [class.highlighted]="flat.indexOf(item) === suggestionHighlightIdx()"
+                  (mousedown)="selectSuggestion(item); $event.preventDefault()"
+                >{{ item }}</button>
+              }
+            }
+          </div>
         }
       </div>
       </div>
@@ -128,7 +149,7 @@
                   [title]="loggedIds().has(game.id!) ? 'Logged!' : 'Log play'"
                   (click)="logPlay(game)"
                 >{{ loggedIds().has(game.id!) ? '✓' : '▶️' }}</button>
-                <a [routerLink]="['/games', game.id, 'edit']" class="btn btn--icon" title="Edit">✏️</a>
+                <a [routerLink]="['/games', game.id, 'edit']" [queryParams]="searchTerm() ? { search: searchTerm() } : {}" class="btn btn--icon" title="Edit">✏️</a>
                 <button type="button" class="btn btn--icon btn--icon-danger" title="Delete" (click)="confirmDelete(game)">🗑️</button>
               </td>
             </tr>
@@ -250,7 +271,7 @@
 
         <footer class="modal__footer">
           <button type="button" class="btn btn--ghost" (click)="closeDetail()">Close</button>
-          <a [routerLink]="['/games', game.id, 'edit']" class="btn btn--primary" (click)="closeDetail()">Edit</a>
+          <a [routerLink]="['/games', game.id, 'edit']" [queryParams]="searchTerm() ? { search: searchTerm() } : {}" class="btn btn--primary" (click)="closeDetail()">Edit</a>
         </footer>
       </div>
     }

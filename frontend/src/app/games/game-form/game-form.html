@@ -52,8 +52,11 @@
         @if (showSeriesSuggestion()) {
           <div class="series-hint field--wide">
             <p class="series-hint__text">
-              Looks related to <strong>{{ seriesMatchGame()?.title }}</strong> in your collection.
-              Add both to a series?
+              @if (seriesMatchGame()?.seriesName) {
+                Looks related to the <strong>{{ seriesMatchGame()?.seriesName }}</strong> series. Add this game to it?
+              } @else {
+                Looks related to <strong>{{ seriesMatchGame()?.title }}</strong> in your collection. Add both to a series?
+              }
             </p>
             <div class="series-hint__row">
               <input
@@ -70,20 +73,6 @@
             </div>
           </div>
         }
-
-        <label class="field field--wide">
-          <span>
-            Series name
-            <span class="field__optional">optional</span>
-          </span>
-          <input
-            name="seriesName"
-            type="text"
-            [ngModel]="draft().seriesName"
-            (ngModelChange)="draft.update(d => ({ ...d, seriesName: $event || null }))"
-            placeholder="e.g. Fluxx, Pandemic"
-          />
-        </label>
 
         <div class="field field--wide">
           <span>
@@ -109,6 +98,38 @@
                 [class.range-end]="n === draft().maxPlayers"
                 (click)="onPlayerClick(n)"
               >{{ n === PLAYERS_UNLIMITED ? '10+' : n }}</button>
+            }
+          </div>
+        </div>
+
+        <div class="field field--wide">
+          <span>
+            Series name
+            <span class="field__optional">optional</span>
+          </span>
+          <div class="tag-combobox">
+            <input
+              name="seriesName"
+              type="text"
+              [ngModel]="draft().seriesName"
+              (ngModelChange)="draft.update(d => ({ ...d, seriesName: $event || null })); seriesHighlightIdx.set(-1)"
+              (focus)="seriesInputFocused.set(true)"
+              (blur)="seriesInputFocused.set(false)"
+              (keydown)="onSeriesKeydown($event)"
+              placeholder="e.g. Fluxx, Pandemic"
+              autocomplete="off"
+            />
+            @if (seriesDropdownOpen()) {
+              <ul class="tag-suggestions" role="listbox">
+                @for (s of seriesSuggestions(); track s; let i = $index) {
+                  <li
+                    class="tag-suggestion-item"
+                    [class.highlighted]="seriesHighlightIdx() === i"
+                    role="option"
+                    (mousedown)="$event.preventDefault(); selectSeriesSuggestion(s)"
+                  >{{ s }}</li>
+                }
+              </ul>
             }
           </div>
         </div>

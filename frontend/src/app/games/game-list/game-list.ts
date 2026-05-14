@@ -1,6 +1,6 @@
 import { Component, ElementRef, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 
 import { GameApi, GamePlay } from '@shared/api';
 import { Game, PLAYERS_UNLIMITED, TIME_UNLIMITED } from '@shared/models';
@@ -15,6 +15,7 @@ import { ToastService, describeHttpError, formatTime, formatDate } from '@shared
 export class GameList implements OnInit {
   private readonly api = inject(GameApi);
   private readonly toast = inject(ToastService);
+  private readonly route = inject(ActivatedRoute);
 
   readonly deleteDialog = viewChild<ElementRef<HTMLDialogElement>>('deleteDialog');
   readonly detailDialog = viewChild<ElementRef<HTMLDialogElement>>('detailDialog');
@@ -27,6 +28,8 @@ export class GameList implements OnInit {
   readonly error = signal<string | null>(null);
 
   readonly searchTerm = signal('');
+  readonly searchFocused = signal(false);
+  readonly suggestionHighlightIdx = signal(-1);
   readonly loggedIds = signal<Set<number>>(new Set());
 
   readonly playHistory = signal<GamePlay[]>([]);
@@ -47,6 +50,30 @@ export class GameList implements OnInit {
 
   readonly sortKey = signal<SortKey>('title-asc');
   readonly sortOpen = signal(false);
+
+  readonly searchSuggestions = computed<{ label: string; items: string[] }[]>(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    if (!term) return [];
+    const games = this.games();
+    const titles = games.filter(g => g.title.toLowerCase().includes(term)).slice(0, 3).map(g => g.title);
+    const allCats = [...new Set(games.flatMap(g => g.categories))];
+    const categories = allCats.filter(c => c.toLowerCase().includes(term)).slice(0, 3);
+    const allMechs = [...new Set(games.flatMap(g => g.mechanics))];
+    const mechanics = allMechs.filter(m => m.toLowerCase().includes(term)).slice(0, 3);
+    const groups: { label: string; items: string[] }[] = [];
+    if (titles.length) groups.push({ label: 'Titles', items: titles });
+    if (categories.length) groups.push({ label: 'Categories', items: categories });
+    if (mechanics.length) groups.push({ label: 'Mechanics', items: mechanics });
+    return groups;
+  });
+
+  readonly flatSuggestions = computed(() =>
+    this.searchSuggestions().flatMap(g => g.items)
+  );
+
+  readonly searchSuggestionsOpen = computed(() =>
+    this.searchFocused() && this.searchSuggestions().length > 0
+  );
 
   readonly filteredGames = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
@@ -72,6 +99,8 @@ export class GameList implements OnInit {
 
   ngOnInit(): void {
     this.refresh();
+    const search = this.route.snapshot.queryParamMap.get('search');
+    if (search) this.searchTerm.set(search);
   }
 
   refresh(): void {
@@ -177,6 +206,39 @@ export class GameList implements OnInit {
         this.gameToDelete.set(null);
       }
     });
+  }
+
+  selectSuggestion(value: string): void {
+    this.searchTerm.set(value);
+    this.searchFocused.set(false);
+    this.suggestionHighlightIdx.set(-1);
+  }
+
+  onSearchBlur(): void {
+    setTimeout(() => this.searchFocused.set(false), 150);
+  }
+
+  onSearchKeydown(event: KeyboardEvent): void {
+    const flat = this.flatSuggestions();
+    const idx = this.suggestionHighlightIdx();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.suggestionHighlightIdx.set(Math.min(idx + 1, flat.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.suggestionHighlightIdx.set(Math.max(idx - 1, -1));
+    } else if (event.key === 'Enter' && idx >= 0) {
+      event.preventDefault();
+      this.selectSuggestion(flat[idx]);
+    } else if (event.key === 'Escape') {
+      this.searchFocused.set(false);
+      this.suggestionHighlightIdx.set(-1);
+    }
+  }
+
+  onSearchTermChange(value: string): void {
+    this.searchTerm.set(value);
+    this.suggestionHighlightIdx.set(-1);
   }
 
   selectSort(key: SortKey): void {

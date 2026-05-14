@@ -57,6 +57,7 @@ export class GameForm implements OnInit {
 
   readonly editId = signal<number | null>(null);
   readonly loading = signal(false);
+  private returnSearch: string | null = null;
 
   readonly categoryInfoDialog = viewChild<ElementRef<HTMLDialogElement>>('categoryInfoDialog');
   readonly mechanicInfoDialog = viewChild<ElementRef<HTMLDialogElement>>('mechanicInfoDialog');
@@ -104,6 +105,19 @@ export class GameForm implements OnInit {
 
   // Series suggestion + duplicate warning state — only active when adding a new game.
   private readonly allGames = signal<import('@shared/models').Game[]>([]);
+  readonly existingSeriesNames = computed(() =>
+    [...new Set(this.allGames().map(g => g.seriesName).filter((s): s is string => !!s))].sort()
+  );
+  readonly seriesInputFocused = signal(false);
+  readonly seriesHighlightIdx = signal(-1);
+  readonly seriesSuggestions = computed(() => {
+    const q = (this.draft().seriesName ?? '').trim().toLowerCase();
+    const all = this.existingSeriesNames();
+    return q ? all.filter(s => s.toLowerCase().includes(q)) : all;
+  });
+  readonly seriesDropdownOpen = computed(() =>
+    this.seriesInputFocused() && this.seriesSuggestions().length > 0
+  );
   private titleDebounceTimer: ReturnType<typeof setTimeout> | null = null;
   readonly duplicateGame = signal<import('@shared/models').Game | null>(null);
   readonly duplicateDismissed = signal(false);
@@ -186,6 +200,8 @@ export class GameForm implements OnInit {
   );
 
   ngOnInit(): void {
+    this.returnSearch = this.route.snapshot.queryParamMap.get('search');
+
     this.api.list().subscribe({
       next: (games) => {
         this.allGames.set(games);
@@ -216,7 +232,7 @@ export class GameForm implements OnInit {
   }
 
   cancel(): void {
-    this.router.navigate(['/collection']);
+    this.router.navigate(['/collection'], { queryParams: this.returnSearch ? { search: this.returnSearch } : {} });
   }
 
   onTitleBlur(): void {
@@ -274,6 +290,31 @@ export class GameForm implements OnInit {
     this.seriesDismissed.set(true);
   }
 
+  selectSeriesSuggestion(name: string): void {
+    this.draft.update(d => ({ ...d, seriesName: name }));
+    this.seriesInputFocused.set(false);
+    this.seriesHighlightIdx.set(-1);
+  }
+
+  onSeriesKeydown(event: KeyboardEvent): void {
+    const suggestions = this.seriesSuggestions();
+    const idx = this.seriesHighlightIdx();
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      this.seriesHighlightIdx.set(Math.min(idx + 1, suggestions.length - 1));
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      this.seriesHighlightIdx.set(Math.max(idx - 1, -1));
+    } else if (event.key === 'Enter') {
+      event.preventDefault();
+      if (!suggestions.length) return;
+      this.selectSeriesSuggestion(idx >= 0 ? suggestions[idx] : suggestions[0]);
+    } else if (event.key === 'Escape') {
+      this.seriesInputFocused.set(false);
+      this.seriesHighlightIdx.set(-1);
+    }
+  }
+
   save(): void {
     this.draft.update(d => ({ ...d, title: toTitleCase(d.title) }));
     const game = this.draft();
@@ -316,13 +357,15 @@ export class GameForm implements OnInit {
       ? mainRequest.pipe(switchMap(() => forkJoin(followUps)))
       : mainRequest;
 
+    const backNav = () => this.router.navigate(['/collection'], { queryParams: this.returnSearch ? { search: this.returnSearch } : {} });
+
     pipeline.subscribe({
-      next: () => this.router.navigate(['/collection']),
+      next: () => backNav(),
       error: (err: unknown) => {
         this.formError.set(describeHttpError(err));
         this.saving.set(false);
       },
-      complete: () => this.router.navigate(['/collection']),
+      complete: () => backNav(),
     });
   }
 
