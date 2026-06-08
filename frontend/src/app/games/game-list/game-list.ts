@@ -56,9 +56,9 @@ export class GameList implements OnInit {
     if (!term) return [];
     const games = this.games();
     const titles = games.filter(g => g.title.toLowerCase().includes(term)).slice(0, 3).map(g => g.title);
-    const allCats = [...new Set(games.flatMap(g => g.categories))];
+    const allCats = [...new Set(games.flatMap(g => g.categories))].filter(Boolean);
     const categories = allCats.filter(c => c.toLowerCase().includes(term)).slice(0, 3);
-    const allMechs = [...new Set(games.flatMap(g => g.mechanics))];
+    const allMechs = [...new Set(games.flatMap(g => g.mechanics))].filter(Boolean);
     const mechanics = allMechs.filter(m => m.toLowerCase().includes(term)).slice(0, 3);
     const groups: { label: string; items: string[] }[] = [];
     if (titles.length) groups.push({ label: 'Titles', items: titles });
@@ -83,8 +83,8 @@ export class GameList implements OnInit {
     const filtered = this.games().filter((g) => {
       if (!term) return true;
       if (g.title.toLowerCase().includes(term)) return true;
-      if (g.categories.some((c) => c.toLowerCase().includes(term))) return true;
-      if (g.mechanics.some((m) => m.toLowerCase().includes(term))) return true;
+      if (g.categories.some((c) => c?.toLowerCase().includes(term))) return true;
+      if (g.mechanics.some((m) => m?.toLowerCase().includes(term))) return true;
       if (g.notes && g.notes.toLowerCase().includes(term)) return true;
       if (numeric) {
         if (g.minPlayers != null && g.maxPlayers != null && asNumber >= g.minPlayers && asNumber <= g.maxPlayers) return true;

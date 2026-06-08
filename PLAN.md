@@ -283,7 +283,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Edit form — `/games/:id/edit` reuses `GameForm`, pre-populates draft from API, calls PUT on save
   - [x] ~~BGG autocomplete in add form~~ — removed; BGG XML API2 returns 401, no viable free API exists. Manual entry only.
   - [x] `BggApi` service (frontend) — wrappers around `/api/bgg/search` and `/api/bgg/{bggId}`
-  - [x] Suggestion page (`/suggest`) — criteria form + paginated ranked results with score badge and reasons
+  - [x] Suggestion page (`/suggest`) — criteria form + paginated ranked results with score badge, notes blurb (when present), and category/mechanic chips (capped at 4, +N more pill)
   - [x] Dictionary page (`/dictionary`) — searchable reference for all categories and mechanics with descriptions
   - [x] `ThemeService` — dark/light mode toggle, persisted to localStorage, respects `prefers-color-scheme`
   - [x] `ToastService` + `toast.component.ts` — signal-based toast queue with action support and auto-dismiss
@@ -316,6 +316,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 
 Record changes here when scope, stack, or design shifts. Newest first.
 
+- **2026-05-22** — **Suggestion result cards now show game context for unfamiliar players**. Removed the reasons list from result cards. Added: (1) notes as an italic blurb beneath the meta line when the game has notes; (2) category/mechanic chips (up to 4, combined; a `+N more` pill handles overflow). Gives someone who hasn't played a game enough context to understand what it is without opening the detail modal.
 - **2026-05-13** — **Duplicate game warning on add form**. When typing a title on the Add Game form, the existing 400ms debounced check now also runs a duplicate pass before the series-similarity check. `titlesDuplicate()` normalises both titles (lowercase, strip punctuation, collapse whitespace) and flags an exact match. If a duplicate is found, a red warning banner appears below the title field with the matching game's name and a "View it" link that opens the existing game's edit page in a new tab. Dismissing the banner or changing the title clears it. The duplicate check takes priority — if a duplicate is detected the series hint is suppressed for that title.
 - **2026-05-13** — **Series name shown in collection page game detail popup** and suggestion page result detail modal.
 - **2026-05-13** — **Series selection narrows category/mechanic chips** on the suggestion page. Added series filter to `gamesMatchingHardCriteria` so selecting a series chip updates available categories and mechanics to only those present in games belonging to that series — consistent with how other hard criteria affect chip availability.

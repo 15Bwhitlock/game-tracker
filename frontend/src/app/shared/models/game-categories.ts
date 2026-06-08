@@ -9,7 +9,6 @@ export const GAME_CATEGORIES: GameTag[] = [
   { name: 'Card Game', description: 'The primary component and mechanic involves cards' },
   { name: 'Party', description: 'Designed for large groups, fast-paced and highly social' },
   { name: 'Abstract', description: 'No theme — pure strategy with perfect information (e.g. Chess, Go)' },
-  { name: 'Cooperative', description: 'All players work together toward a shared goal' },
   { name: 'Economic', description: 'Core loop involves earning, spending, and managing money or resources' },
   { name: 'Deck Building', description: 'Players start with a basic deck and acquire better cards over the game' },
   { name: 'Dice Game', description: 'Dice are the primary component driving outcomes' },

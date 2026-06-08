@@ -256,12 +256,21 @@
                     · rated {{ sg.game.personalRating }}/10
                   }
                 </div>
-                @if (sg.reasons.length > 0) {
-                  <ul class="suggestion__reasons">
-                    @for (reason of sg.reasons; track reason) {
-                      <li>{{ reason }}</li>
+                @if (sg.game.notes) {
+                  <p class="suggestion__notes">{{ sg.game.notes }}</p>
+                }
+                @if (sg.game.categories.length || sg.game.mechanics.length) {
+                  <div class="suggestion__tags">
+                    @for (cat of sg.game.categories.slice(0, 4); track cat) {
+                      <span class="suggestion__tag">{{ cat }}</span>
                     }
-                  </ul>
+                    @for (mec of sg.game.mechanics.slice(0, Math.max(0, 4 - sg.game.categories.length)); track mec) {
+                      <span class="suggestion__tag">{{ mec }}</span>
+                    }
+                    @if (sg.game.categories.length + sg.game.mechanics.length > 4) {
+                      <span class="suggestion__tag suggestion__tag--more">+{{ sg.game.categories.length + sg.game.mechanics.length - 4 }} more</span>
+                    }
+                  </div>
                 }
                 <div class="suggestion__actions">
                   <button

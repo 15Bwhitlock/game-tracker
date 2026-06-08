@@ -506,12 +506,32 @@
   margin-top: 0.25rem;
 }
 
-.suggestion__reasons {
-  margin: 0.25rem 0 0;
-  padding-left: 1.1rem;
+.suggestion__notes {
+  margin: 0.1rem 0 0;
   font-size: 0.85rem;
-  color: var(--text-body);
+  color: var(--text-secondary);
+  font-style: italic;
+  line-height: 1.5;
+}
+
+.suggestion__tags {
   display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.suggestion__tag {
+  padding: 0.15rem 0.55rem;
+  font-size: 0.78rem;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent-text);
+  border: 1px solid var(--accent-dim-strong);
+
+  &--more {
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    border-color: var(--border);
+  }
 }

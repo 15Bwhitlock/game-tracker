@@ -52,12 +52,12 @@ App is served at `http://localhost:4200`. `/api/*` requests are proxied to the b
 
 ## Features
 
-- **Collection** (`/collection`) — table of owned games with title, player count, average play time, and personal rating. Client-side search filters by title, players, and time. Each row has Log Play, Edit, and Delete (with confirmation) actions.
-- **Add / Edit game** (`/games/add`, `/games/:id/edit`) — full form with button-group selectors for player count (1–10+), play time (15m–4h+), personal rating (1–10), and complexity (1–5). Categories and mechanics use a toggle-chip grid (selected items float to the top) with hover tooltips and a reference dialog. Custom categories/mechanics can be typed in. Also has a Last Played date and a Notes field.
-- **Log play** — "Log play" button on each collection row sets `lastPlayedAt` to today, feeding the variety bonus in suggestion scoring.
-- **Suggestions** (`/suggest`) — criteria form (player count, max time, complexity range, categories, mechanics) → ranked results with a score badge and human-readable reasons. Scoring combines a variety bonus (months since last played, capped at 6) and personal rating.
+- **Collection** (`/collection`) — table of owned games with title, player count, average play time, and personal rating. Client-side search filters by title, categories, mechanics, notes, player count, play time, and rating. Each row has Log Play (with undo toast), Edit, and Delete (with confirmation) actions.
+- **Add / Edit game** (`/games/add`, `/games/:id/edit`) — full form with button-group selectors for player count (1–10+), play time (15m–4h+), personal rating (1–10), and complexity (1–5). Categories and mechanics use a toggle-chip grid (selected items float to the top) with hover tooltips, a reference dialog, and an autocomplete combobox that suggests presets and in-use tags. Also has series name (with similarity hint when a related game is detected), last played date, notes, and a removable play history list.
+- **Suggestions** (`/suggest`) — criteria form with player count, time range, complexity range, favorites-only toggle, unplayed-only toggle, max play count, min rating, series, categories, and mechanics. Five preset buttons (Quick game, Game night, Party, New to me, Top picks) stamp sensible defaults in one click. Category/mechanic chips are dynamically filtered to only show options present in games matching the current hard criteria — stale selections are visually distinguished. Results show a score badge, notes blurb (when present), and category/mechanic chips so unfamiliar players can understand each game at a glance. Scoring combines a variety bonus (months since last played, capped at 6) and personal rating. Paginated with "Show more."
 - **Dictionary** (`/dictionary`) — searchable reference of all preset categories and mechanics with descriptions, so you know which tags apply to a game.
 - **BGG lookup** — search and import metadata from BoardGameGeek (`/api/bgg/search`, `/api/bgg/{bggId}`), cached to absorb their aggressive rate limits.
+- **Dark / light mode** — theme toggle persisted to `localStorage`, defaults to `prefers-color-scheme`.
 
 ## API surface
 
@@ -66,8 +66,12 @@ App is served at `http://localhost:4200`. `/api/*` requests are proxied to the b
 | GET | `/api/games` | list (filterable: `players`, `maxMinutes`, `category`) |
 | GET | `/api/games/{id}` | detail |
 | POST | `/api/games` | add |
-| PUT | `/api/games/{id}` | edit / log play |
+| PUT | `/api/games/{id}` | edit |
 | DELETE | `/api/games/{id}` | remove |
+| POST | `/api/games/{id}/plays` | log a play |
+| DELETE | `/api/games/{id}/plays/{playId}` | undo a logged play |
+| GET | `/api/games/{id}/plays` | play history for a game |
+| PATCH | `/api/games/{id}/series` | update series name without a full PUT |
 | GET | `/api/bgg/search?q=...` | proxy a BGG search |
 | GET | `/api/bgg/{bggId}` | fetch full metadata from BGG |
 | POST | `/api/suggestions` | scored list of owned games matching criteria |
@@ -89,7 +93,10 @@ game-tracker/
       ├─ games/             # game-list, game-form
       ├─ suggestions/       # suggest-page
       ├─ dictionary/        # dictionary-page
-      └─ shared/            # GameApi, SuggestionApi, game-categories, game-mechanics
+      └─ shared/
+         ├─ models/         # game.ts, suggestion.ts, game-categories.ts, game-mechanics.ts, game-constants.ts, bgg.ts
+         ├─ api/            # game-api.ts, suggestion-api.ts, bgg-api.ts
+         └─ services/       # theme.service.ts, toast.service.ts, http-error.ts, format-utils.ts
 ```
 
 ## Production build

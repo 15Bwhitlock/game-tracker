@@ -13,6 +13,8 @@ import { Game, ScoredGame, SuggestionCriteria, SuggestionPage, GAME_CATEGORIES, 
   styleUrl: './suggest-page.scss'
 })
 export class SuggestPage implements OnInit {
+  protected readonly Math = Math;
+
   private readonly api = inject(SuggestionApi);
   private readonly gameApi = inject(GameApi);
   private readonly toast = inject(ToastService);

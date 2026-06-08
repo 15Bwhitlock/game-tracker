@@ -1,14 +1,18 @@
 package com.braydenwhitlock.gametracker.game;
 
+import com.github.dockerjava.api.model.HostConfig;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.PostgreSQLContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -21,10 +25,24 @@ class GameRepositoryTest {
 
     @Container
     @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15");
+    // seccomp:unconfined mirrors docker-compose.yml — required on Docker Desktop ≤20.10.
+    // Patch the existing HostConfig rather than replacing it so Testcontainers' port bindings survive.
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:15")
+            .waitingFor(Wait.forListeningPort().withStartupTimeout(Duration.ofSeconds(120)))
+            .withCreateContainerCmdModifier(cmd -> {
+                HostConfig hc = cmd.getHostConfig();
+                if (hc == null) hc = new HostConfig();
+                cmd.withHostConfig(hc.withSecurityOpts(List.of("seccomp=unconfined")));
+            });
 
     @Autowired
     private GameRepository gameRepository;
+
+    @BeforeEach
+    void clearDatabase() {
+        gameRepository.deleteAll();
+        gameRepository.flush();
+    }
 
     @Test
     void persistsAndLoadsGameWithCollections() {
@@ -53,6 +71,25 @@ class GameRepositoryTest {
         assertThat(loaded.getCategories()).containsExactlyInAnyOrder("Strategy", "Economic");
         assertThat(loaded.getMechanics()).containsExactlyInAnyOrder("Trading", "Dice Rolling");
         assertThat(loaded.getPersonalRating()).isEqualTo(8);
+    }
+
+    @Test
+    void persistsSeriesNameAndFavoriteFlag() {
+        Game game = new Game();
+        game.setTitle("Cthulhu Fluxx");
+        game.setMinPlayers(2);
+        game.setMaxPlayers(6);
+        game.setMinPlayTimeMinutes(15);
+        game.setMaxPlayTimeMinutes(30);
+        game.setSeriesName("Fluxx");
+        game.setFavorite(true);
+
+        Game saved = gameRepository.saveAndFlush(game);
+        gameRepository.findById(saved.getId());
+
+        Game loaded = gameRepository.findAll().get(0);
+        assertThat(loaded.getSeriesName()).isEqualTo("Fluxx");
+        assertThat(loaded.isFavorite()).isTrue();
     }
 
     @Test

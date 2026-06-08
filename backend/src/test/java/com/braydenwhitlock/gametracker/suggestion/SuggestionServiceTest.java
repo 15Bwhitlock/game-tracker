@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.lang.reflect.Field;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -38,7 +39,7 @@ class SuggestionServiceTest {
     }
 
     private static SuggestionCriteria forPlayers(int players) {
-        return new SuggestionCriteria(players, players, null, null, null, null, null, null, null, null, null, null, 0);
+        return new SuggestionCriteria(players, players, null, null, null, null, null, null, null, null, null, null, null, 0);
     }
 
     private List<ScoredGame> suggest(SuggestionCriteria c) {
@@ -75,7 +76,7 @@ class SuggestionServiceTest {
         Game shortGame = game("Quickie", 2, 4, 15, 30, null, null, null);
         stub(longGame, shortGame);
 
-        SuggestionCriteria under60 = new SuggestionCriteria(3, 3, null, 60, null, null, null, null, null, null, null, null, 0);
+        SuggestionCriteria under60 = new SuggestionCriteria(3, 3, null, 60, null, null, null, null, null, null, null, null, null, 0);
         List<ScoredGame> result = suggest(under60);
 
         assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Quickie");
@@ -89,7 +90,7 @@ class SuggestionServiceTest {
         Game unknown = game("Unrated", 2, 4, 30, 30, null, null, null);
         stub(light, medium, heavy, unknown);
 
-        SuggestionCriteria midRange = new SuggestionCriteria(3, 3, null, null, 2.0, 3.0, null, null, null, null, null, null, 0);
+        SuggestionCriteria midRange = new SuggestionCriteria(3, 3, null, null, 2.0, 3.0, null, null, null, null, null, null, null, 0);
         List<ScoredGame> result = suggest(midRange);
 
         assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Medium");
@@ -102,7 +103,7 @@ class SuggestionServiceTest {
         stub(strategy, party);
 
         SuggestionCriteria onlyStrategy = new SuggestionCriteria(
-                3, 3, null, null, null, null, List.of("strategy"), null, null, null, null, null, 0);
+                3, 3, null, null, null, null, List.of("strategy"), null, null, null, null, null, null, 0);
 
         List<ScoredGame> result = suggest(onlyStrategy);
 
@@ -116,10 +117,72 @@ class SuggestionServiceTest {
         stub(deck, dice);
 
         SuggestionCriteria deckOrDraft = new SuggestionCriteria(
-                3, 3, null, null, null, null, null, List.of("Deck Building", "Drafting"), null, null, null, null, 0);
+                3, 3, null, null, null, null, null, List.of("Deck Building", "Drafting"), null, null, null, null, null, 0);
         List<ScoredGame> result = suggest(deckOrDraft);
 
         assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Deck");
+    }
+
+    @Test
+    void filtersUnplayedOnly() {
+        Game neverPlayed = game("Fresh", 2, 4, 30, 30, null, null, null);
+        Game played = game("Worn", 2, 4, 30, 30, null, null, null);
+        played.setLastPlayedAt(TODAY.minusDays(10));
+        stub(neverPlayed, played);
+
+        SuggestionCriteria unplayedOnly = new SuggestionCriteria(
+                3, 3, null, null, null, null, null, null, null, null, true, null, null, 0);
+        List<ScoredGame> result = suggest(unplayedOnly);
+
+        assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Fresh");
+    }
+
+    @Test
+    void filtersByMaxPlayCount() throws Exception {
+        Game rarelyPlayed = game("Rare", 2, 4, 30, 30, null, null, null);
+        setPlayCount(rarelyPlayed, 2);
+        Game frequentlyPlayed = game("Frequent", 2, 4, 30, 30, null, null, null);
+        setPlayCount(frequentlyPlayed, 10);
+        stub(rarelyPlayed, frequentlyPlayed);
+
+        SuggestionCriteria maxThreePlays = new SuggestionCriteria(
+                3, 3, null, null, null, null, null, null, null, null, null, 3, null, 0);
+        List<ScoredGame> result = suggest(maxThreePlays);
+
+        assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Rare");
+    }
+
+    @Test
+    void filtersByMinRating() {
+        Game highRated = game("Top", 2, 4, 30, 30, null, null, null);
+        highRated.setPersonalRating(8);
+        Game lowRated = game("Low", 2, 4, 30, 30, null, null, null);
+        lowRated.setPersonalRating(4);
+        Game unrated = game("Unrated", 2, 4, 30, 30, null, null, null);
+        stub(highRated, lowRated, unrated);
+
+        SuggestionCriteria minRating7 = new SuggestionCriteria(
+                3, 3, null, null, null, null, null, null, null, null, null, null, 7, 0);
+        List<ScoredGame> result = suggest(minRating7);
+
+        assertThat(result).extracting(sg -> sg.game().getTitle()).containsExactly("Top");
+    }
+
+    @Test
+    void filtersBySeries() {
+        Game fluxx = game("Fluxx", 2, 6, 15, 30, null, null, null);
+        fluxx.setSeriesName("Fluxx");
+        Game cthulhuFluxx = game("Cthulhu Fluxx", 2, 6, 15, 30, null, null, null);
+        cthulhuFluxx.setSeriesName("Fluxx");
+        Game unrelated = game("Catan", 3, 4, 60, 120, null, null, null);
+        stub(fluxx, cthulhuFluxx, unrelated);
+
+        SuggestionCriteria fluxxOnly = new SuggestionCriteria(
+                3, 3, null, null, null, null, null, null, List.of("Fluxx"), null, null, null, null, 0);
+        List<ScoredGame> result = suggest(fluxxOnly);
+
+        assertThat(result).extracting(sg -> sg.game().getTitle())
+                .containsExactlyInAnyOrder("Fluxx", "Cthulhu Fluxx");
     }
 
     // -------- scoring --------
@@ -217,11 +280,11 @@ class SuggestionServiceTest {
         assertThat(page0.totalCount()).isEqualTo(25);
         assertThat(page0.page()).isEqualTo(0);
 
-        SuggestionCriteria page1Criteria = new SuggestionCriteria(3, 3, null, null, null, null, null, null, null, null, null, null, 1);
+        SuggestionCriteria page1Criteria = new SuggestionCriteria(3, 3, null, null, null, null, null, null, null, null, null, null, null, 1);
         SuggestionPage page1 = service.suggest(page1Criteria);
         assertThat(page1.items()).hasSize(SuggestionService.PAGE_SIZE);
 
-        SuggestionCriteria page2Criteria = new SuggestionCriteria(3, 3, null, null, null, null, null, null, null, null, null, null, 2);
+        SuggestionCriteria page2Criteria = new SuggestionCriteria(3, 3, null, null, null, null, null, null, null, null, null, null, null, 2);
         SuggestionPage page2 = service.suggest(page2Criteria);
         assertThat(page2.items()).hasSize(5);
     }
@@ -250,4 +313,10 @@ class SuggestionServiceTest {
         return g;
     }
 
+    // playCount is a @Formula with no setter; use reflection to set it in unit tests.
+    private static void setPlayCount(Game game, int count) throws Exception {
+        Field field = Game.class.getDeclaredField("playCount");
+        field.setAccessible(true);
+        field.set(game, count);
+    }
 }
