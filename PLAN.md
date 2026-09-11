@@ -85,6 +85,7 @@ Keep `categories` and `mechanics` as `@ElementCollection<String>` to start — s
 | POST | `/api/games/{gameId}/plays` | log a play (optional `playedAt` date in body; defaults to today) |
 | DELETE | `/api/games/{gameId}/plays/{playId}` | undo a logged play |
 | GET | `/api/games/{gameId}/plays` | list full play history for a game |
+| PATCH | `/api/games/{id}/favorite` | toggle favorite flag |
 
 ### Error handling
 `GlobalExceptionHandler` (`@RestControllerAdvice`) handles:
@@ -202,20 +203,30 @@ Be selective. Chasing coverage on a personal project burns time without payoff. 
 
 ### Lower-value (skip unless something feels fragile)
 - Trivial CRUD controllers — `@WebMvcTest` is fine if you want a smoke test, but one e2e test usually covers the same ground.
-- Angular components and services — skip until you're actually fixing recurring bugs in one. Personal app, you'll notice breakage immediately by using it.
 - Getters/setters, DTO mappers — no logic, no test needed.
+- Angular unit tests (component/service specs in isolation) — still skipped; the Playwright e2e suite below covers the actual user-facing behavior more cheaply than mocking Angular's DI graph would.
 
 ### Tooling
 - **JUnit 5** + **AssertJ** for assertions (`assertThat(...)` reads better than JUnit's built-ins).
 - **Mockito** for mocking the `BggClient` in `SuggestionService` tests.
 - **Testcontainers** (`org.testcontainers:postgresql`) for integration tests — spins up a real Postgres in Docker per test class. Add a `@Testcontainers` base class to share the container across tests.
 - **`@DataJpaTest`** + Testcontainers for repository tests; **`@SpringBootTest`** for one or two end-to-end happy-path tests against the full stack.
+- **Playwright** (`frontend/e2e/`) for frontend e2e — see below.
 - Run tests in CI later if you set one up; for now, `mvn test` locally before committing is enough.
 
 ### Rough target
 - ~80–90% coverage on `SuggestionService` and BGG parsing.
 - One end-to-end "add a game, query suggestions, get it back" integration test.
 - Everything else: untested unless a bug shows up there.
+
+### Frontend e2e (Playwright)
+
+Reverses the earlier "skip frontend tests" call — see the 2026-09-11 decision log entry for why. Lives in `frontend/e2e/`, config at `frontend/playwright.config.ts`.
+
+- **No isolated test database.** Tests run against whatever backend + Postgres `docker compose up -d` / `./mvnw spring-boot:run` are already serving — there's no separate test profile for a personal project this size. Every test seeds its own game(s) through the real `/api/games` via `e2e/support/api.ts`'s `seedGame`/`deleteGame`, and cleans up afterward, so the suite never depends on or permanently mutates the actual collection. Titles are prefixed (`e2eTitle()`) so a failed run's leftovers are easy to spot and sweep.
+- **`workers: 1` is required, not a preference.** Different spec files sharing one real database means a game seeded by one file can be deleted by another file's cleanup mid-test if they run concurrently — hit this for real on the first run (`game-form.spec.ts`'s cleanup swept up a game `collection.spec.ts` had just seeded). Sequential execution is the fix; don't raise `workers` without re-solving that.
+- Run with `npm run test:e2e` (headless) or `npm run test:e2e:ui` (Playwright's UI mode) from `frontend/`, backend + Postgres already running.
+- Covers: collection list/search/log-play/delete, add/edit form including validation errors, suggestion criteria/presets/results including the "no player count" validation error, and the dictionary search. Deliberately does **not** cover `SuggestionCriteria`'s complexity-range validation (the `minComplexity`/`maxComplexity` bug fixed 2026-09-11) — the UI's button-group only ever submits 1–5, so that edge case is only reachable by calling the API directly and belongs in a backend unit/integration test instead, not e2e.
 
 ---
 
@@ -301,6 +312,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Play history on edit form — `removePlay()` on `GameForm`, play history list with ✕ per entry, backed by existing `DELETE /api/games/{id}/plays/{playId}` endpoint
   - [x] Frontend folder restructure — `shared/` split into `models/`, `api/`, `services/`; TypeScript path aliases (`@shared/*`) in `tsconfig.json`; barrel `index.ts` in each subfolder; VS Code file nesting for `.ts`/`.html`/`.scss` groups
   - [ ] Javadoc/TSDoc pass on public APIs (optional for personal use)
+  - [x] Playwright e2e suite (`frontend/e2e/`) — collection, add/edit form, suggestions, dictionary; see Testing strategy section
   - [x] Production build — `frontend-maven-plugin` builds Angular and copies dist into Spring Boot `static/`; `WebConfig` forwards unknown routes to `index.html` for Angular router
 
 ---
@@ -316,6 +328,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 
 Record changes here when scope, stack, or design shifts. Newest first.
 
+- **2026-09-11** — **Playwright e2e suite added** (`frontend/e2e/`), reversing the earlier "frontend tests skipped" call. Trigger: manually verifying the `SuggestionCriteria` validation fix (same date) via a real browser turned into confirming the whole `/suggest` flow worked, which made the case for locking that verification in as a repeatable test rather than a one-off. Covers collection (list/search/log-play/delete-with-confirmation), add/edit form (happy path + validation error), suggestions (rendering, presets, results, validation error), and dictionary search — 13 tests, all against the real dev backend/Postgres (no test-profile infrastructure exists yet for a project this size), seeding/cleaning up their own games via the API. Found and fixed a real cross-file test race on the first run (see Testing strategy section) by forcing `workers: 1`. See the Testing strategy section below for what it does and doesn't cover, and why.
+- **2026-09-11** — **Docs sync**: corrected README's stated Spring Boot version (3.4 → **3.5.14**, per `pom.xml`) and added the previously-undocumented `PATCH /api/games/{id}/favorite` endpoint (toggles `Game.favorite`) to the API surface tables in both README and here. No code changes — the endpoint already existed, it was just missing from docs.
 - **2026-05-22** — **Suggestion result cards now show game context for unfamiliar players**. Removed the reasons list from result cards. Added: (1) notes as an italic blurb beneath the meta line when the game has notes; (2) category/mechanic chips (up to 4, combined; a `+N more` pill handles overflow). Gives someone who hasn't played a game enough context to understand what it is without opening the detail modal.
 - **2026-05-13** — **Duplicate game warning on add form**. When typing a title on the Add Game form, the existing 400ms debounced check now also runs a duplicate pass before the series-similarity check. `titlesDuplicate()` normalises both titles (lowercase, strip punctuation, collapse whitespace) and flags an exact match. If a duplicate is found, a red warning banner appears below the title field with the matching game's name and a "View it" link that opens the existing game's edit page in a new tab. Dismissing the banner or changing the title clears it. The duplicate check takes priority — if a duplicate is detected the series hint is suppressed for that title.
 - **2026-05-13** — **Series name shown in collection page game detail popup** and suggestion page result detail modal.

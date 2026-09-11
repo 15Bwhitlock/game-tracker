@@ -1,5 +1,7 @@
 package com.braydenwhitlock.gametracker.suggestion;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
@@ -28,8 +30,8 @@ public record SuggestionCriteria(
         @Min(1) Integer maxPlayers,
         @Min(1) Integer minMinutes,
         @Min(1) Integer maxMinutes,
-        Double minComplexity,
-        Double maxComplexity,
+        @DecimalMin("1.0") @DecimalMax("5.0") Double minComplexity,
+        @DecimalMin("1.0") @DecimalMax("5.0") Double maxComplexity,
         List<String> categories,
         List<String> mechanics,
         List<String> series,
