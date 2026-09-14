@@ -38,6 +38,12 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
+BGG's XML API2 has required a registered app's bearer token since Oct 2025 — without one, `/api/bgg/*` still works but always returns empty results. To enable it, register at [boardgamegeek.com/using_the_xml_api](https://boardgamegeek.com/using_the_xml_api) (requires a BGG account), then export the token before starting the backend:
+
+```bash
+export BGG_API_TOKEN=your-token-here
+```
+
 API is served at `http://localhost:8080`. Flyway runs migrations on startup (including seed data); JPA validates the schema against entities (`ddl-auto=validate`). Interactive API docs (springdoc-openapi) at `http://localhost:8080/swagger-ui/index.html`, raw spec at `/v3/api-docs`.
 
 ### 3. Run the frontend

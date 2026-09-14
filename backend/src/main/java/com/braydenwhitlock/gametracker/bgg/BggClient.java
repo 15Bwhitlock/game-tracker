@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -25,6 +26,13 @@ import java.util.Optional;
  * {@code /thing?stats=1} (full metadata). Both are cached via {@link CacheConfig} because
  * BGG rate-limits aggressively and occasionally returns 202 "queued" responses for
  * cold lookups; a 24h TTL means subsequent UI hits never feel that latency.
+ *
+ * <p>Since October 2025, BGG requires a registered application's bearer token on every
+ * XML API2 request — unauthenticated calls now get a flat 401 (see
+ * {@code boardgamegeek.com/using_the_xml_api}). Register at BGG to get a token, then set
+ * it via the {@code BGG_API_TOKEN} env var; see PLAN.md's decision log. Without a token,
+ * every call 401s and this degrades to empty results exactly as it always has for any
+ * other BGG error — no crash, just no data, so the app still runs fine unconfigured.
  */
 @Service
 public class BggClient {
@@ -33,9 +41,16 @@ public class BggClient {
     private static final XmlMapper XML = new XmlMapper();
 
     private final RestClient restClient;
+    private final String apiToken;
 
-    public BggClient(@Value("${bgg.base-url:https://boardgamegeek.com}") String baseUrl) {
+    public BggClient(@Value("${bgg.base-url:https://boardgamegeek.com}") String baseUrl,
+                      @Value("${bgg.api-token:}") String apiToken) {
         this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        this.apiToken = apiToken;
+        if (apiToken == null || apiToken.isBlank()) {
+            log.warn("No BGG_API_TOKEN configured — BGG requires a registered app token as of "
+                    + "Oct 2025, so search/lookup will return empty results until one is set.");
+        }
     }
 
     /**
@@ -56,6 +71,7 @@ public class BggClient {
                             .queryParam("query", query.trim())
                             .queryParam("type", "boardgame")
                             .build())
+                    .headers(this::addAuthHeader)
                     .retrieve()
                     .body(String.class);
         } catch (RestClientResponseException e) {
@@ -81,6 +97,7 @@ public class BggClient {
                             .queryParam("id", bggId)
                             .queryParam("stats", 1)
                             .build())
+                    .headers(this::addAuthHeader)
                     .retrieve()
                     .body(String.class);
         } catch (RestClientResponseException e) {
@@ -88,6 +105,17 @@ public class BggClient {
             return Optional.empty();
         }
         return parseThingXml(xml);
+    }
+
+    /**
+     * Adds the bearer token BGG requires as of Oct 2025, when one is configured. A no-op
+     * (request goes out unauthenticated, which BGG will 401) when {@link #apiToken} is blank —
+     * that's still handled gracefully by the callers' catch blocks above.
+     */
+    private void addAuthHeader(HttpHeaders headers) {
+        if (apiToken != null && !apiToken.isBlank()) {
+            headers.setBearerAuth(apiToken);
+        }
     }
 
     /**
