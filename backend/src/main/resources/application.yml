@@ -20,6 +20,12 @@ spring:
 server:
   port: 8080
 
+bgg:
+  # BGG requires a registered app's bearer token on every XML API2 request as of Oct 2025
+  # (see BggClient's javadoc). Register at boardgamegeek.com to get one, then export
+  # BGG_API_TOKEN in your shell before starting the backend. Never commit a real token here.
+  api-token: ${BGG_API_TOKEN:}
+
 logging:
   level:
     com.braydenwhitlock.gametracker: DEBUG
