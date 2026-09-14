@@ -34,7 +34,7 @@ Single Maven project for the backend, separate Angular project for the frontend 
 ## Phase 1 — Backend skeleton
 
 ### Project setup
-- Java 17, Maven, Spring Boot 3.4.x. (Java 17 chosen to match the local install — Spring Boot 3.x works fine on 17. Bump to 21 later if a dependency needs it.)
+- Java 25, Maven, Spring Boot 3.5.x.
 - Dependencies: `Spring Web`, `Spring Data JPA`, `PostgreSQL Driver`, `Validation`, `Flyway` (`flyway-core` + `flyway-database-postgresql`), `Spring Boot DevTools`. Lombok skipped for now (avoid IDE plugin requirement; explicit getters/setters are fine for this size).
 
 ### Database
@@ -368,7 +368,7 @@ Record changes here when scope, stack, or design shifts. Newest first.
 - **2026-05-07** — **Phase 1 vertical slice end-to-end working**: Postgres → Spring Boot → Angular `/collection`. Add a game in the modal, see it persist, delete it, search filters live. Time spent: one session.
 - **2026-05-07** — **Postgres 15** instead of 16, **with** `security_opt: [seccomp:unconfined]` in docker-compose. Reason: this Mac has Docker Desktop 20.10 (2021) whose seccomp profile blocks syscalls modern Postgres needs (`popen failure: Operation not permitted` from `initdb`). Postgres 15 alone wasn't enough; only the combo worked. Testcontainers test image bumped to match. Revisit when Docker Desktop is upgraded.
 - **2026-05-07** — **Flyway from day 1** with `ddl-auto=validate`, instead of starting on `ddl-auto=update` and migrating later. Reason: Flyway expects to own the schema from the first migration; the cutover is fiddly. Cheaper to write `V1__init_schema.sql` upfront. Phase 1 status moved this from Phase 4.
-- **2026-05-07** — **Java 17** instead of Java 21. Reason: matches the local install; Spring Boot 3.x supports 17+. No reason to force a JDK upgrade for a personal project.
+- **2026-09-14** — **Java 25** runtime. Upgraded to the latest Java LTS release; Spring Boot 3.5 supports Java 25.
 - **2026-05-07** — **No UI library yet** — plain SCSS rather than Angular Material or Tailwind. Reason: the `/collection` UI was simple enough that adding a library would be premature. Plan to revisit when building the BGG autocomplete (Material's autocomplete is the obvious choice there).
 - **2026-05-07** — Added Code documentation section. Standard: Javadoc/TSDoc on public APIs, "why" comments on non-obvious logic, skip noise comments that restate code.
 - **2026-05-07** — Added Testing strategy section. Selective approach: focus on `SuggestionService` scoring and BGG XML parsing; Testcontainers for repository tests; skip frontend tests until bugs warrant them.
