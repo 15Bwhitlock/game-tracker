@@ -8,13 +8,18 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.io.IOException;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -23,9 +28,10 @@ import java.util.Optional;
  * Client for BoardGameGeek's XML API2.
  *
  * <p>Two endpoints are wrapped: {@code /search} (lightweight, name + year only) and
- * {@code /thing?stats=1} (full metadata). Both are cached via {@link CacheConfig} because
- * BGG rate-limits aggressively and occasionally returns 202 "queued" responses for
- * cold lookups; a 24h TTL means subsequent UI hits never feel that latency.
+ * {@code /thing?stats=1} (full metadata). Both are cached via {@link CacheConfig} — BGG
+ * rate-limits aggressively, and a 24h TTL means subsequent UI hits never feel that latency.
+ * {@code /thing} lookups also retry a few times on their own 202 ("queued, try again
+ * shortly") response, distinct from our own cache — see {@link #fetchThingXml}.
  *
  * <p>Since October 2025, BGG requires a registered application's bearer token on every
  * XML API2 request — unauthenticated calls now get a flat 401 (see
@@ -40,12 +46,31 @@ public class BggClient {
     private static final Logger log = LoggerFactory.getLogger(BggClient.class);
     private static final XmlMapper XML = new XmlMapper();
 
+    // Identifies us to BGG per their app-registration terms; also just good API citizenship.
+    private static final String USER_AGENT =
+            "game-tracker/1.0 (+https://github.com/15Bwhitlock/game-tracker; personal, non-commercial)";
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(5);
+    private static final Duration READ_TIMEOUT = Duration.ofSeconds(10);
+    // BGG returns 202 ("request queued, retry shortly") for /thing lookups it hasn't
+    // pre-built on its own end yet — this is a cold-cache condition on *their* side,
+    // distinct from our own Caffeine cache. Retry a few times before giving up.
+    private static final int THING_MAX_RETRIES = 3;
+    private static final Duration THING_RETRY_DELAY = Duration.ofSeconds(2);
+
     private final RestClient restClient;
     private final String apiToken;
 
     public BggClient(@Value("${bgg.base-url:https://boardgamegeek.com}") String baseUrl,
                       @Value("${bgg.api-token:}") String apiToken) {
-        this.restClient = RestClient.builder().baseUrl(baseUrl).build();
+        ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect()
+                .build(ClientHttpRequestFactorySettings.defaults()
+                        .withConnectTimeout(CONNECT_TIMEOUT)
+                        .withReadTimeout(READ_TIMEOUT));
+        this.restClient = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(requestFactory)
+                .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
+                .build();
         this.apiToken = apiToken;
         if (apiToken == null || apiToken.isBlank()) {
             log.warn("No BGG_API_TOKEN configured — BGG requires a registered app token as of "
@@ -92,19 +117,46 @@ public class BggClient {
     public Optional<BggGameDetails> getDetails(int bggId) {
         String xml;
         try {
-            xml = restClient.get()
+            xml = fetchThingXml(bggId);
+        } catch (RestClientResponseException e) {
+            log.warn("BGG thing lookup failed for id={} ({})", bggId, e.getStatusCode());
+            return Optional.empty();
+        }
+        return parseThingXml(xml);
+    }
+
+    /**
+     * Fetches the raw /thing XML, retrying on a 202 ("queued, try again shortly") a few
+     * times before giving up. A non-202 response — success or error — returns immediately.
+     */
+    private String fetchThingXml(int bggId) {
+        for (int attempt = 0; attempt <= THING_MAX_RETRIES; attempt++) {
+            ResponseEntity<String> response = restClient.get()
                     .uri(uri -> uri.path("/xmlapi2/thing")
                             .queryParam("id", bggId)
                             .queryParam("stats", 1)
                             .build())
                     .headers(this::addAuthHeader)
                     .retrieve()
-                    .body(String.class);
-        } catch (RestClientResponseException e) {
-            log.warn("BGG thing lookup failed for id={} ({})", bggId, e.getStatusCode());
-            return Optional.empty();
+                    .toEntity(String.class);
+            if (response.getStatusCode().value() != 202) {
+                return response.getBody();
+            }
+            if (attempt < THING_MAX_RETRIES) {
+                log.debug("BGG thing lookup for id={} still queued (202), retrying in {}", bggId, THING_RETRY_DELAY);
+                sleepQuietly(THING_RETRY_DELAY);
+            }
         }
-        return parseThingXml(xml);
+        log.warn("BGG thing lookup for id={} still queued after {} retries, giving up", bggId, THING_MAX_RETRIES);
+        return null;
+    }
+
+    private static void sleepQuietly(Duration duration) {
+        try {
+            Thread.sleep(duration.toMillis());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
     }
 
     /**
