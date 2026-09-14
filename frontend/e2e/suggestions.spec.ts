@@ -246,6 +246,71 @@ test.describe('Suggestions page', () => {
     }
   });
 
+  test('results are ranked by score (rating bonus), not just alphabetically or insertion order', async ({ page, request }) => {
+    // Both unplayed (equal variety bonus), so score is driven entirely by personalRating —
+    // the higher-rated game must rank first even though its title sorts after the other's.
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const aTitleLowRating = e2eTitle('Aaa Low Rated');
+    const zTitleHighRating = e2eTitle('Zzz High Rated');
+    const lowId = await seedGame(request, { title: aTitleLowRating, minPlayers: 2, maxPlayers: 2, categories: [category], personalRating: 2 });
+    const highId = await seedGame(request, { title: zTitleHighRating, minPlayers: 2, maxPlayers: 2, categories: [category], personalRating: 10 });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+      await page.getByRole('button', { name: category, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+
+      const items = page.locator('li.suggestion');
+      await expect(items).toHaveCount(2);
+      await expect(items.nth(0)).toContainText(zTitleHighRating);
+      await expect(items.nth(1)).toContainText(aTitleLowRating);
+      // The rank badge and score should reflect the ordering too, not just DOM position.
+      await expect(items.nth(0).locator('.suggestion__rank')).toHaveText('1');
+      await expect(items.nth(1).locator('.suggestion__rank')).toHaveText('2');
+    } finally {
+      await deleteGame(request, lowId);
+      await deleteGame(request, highId);
+    }
+  });
+
+  test('series filter narrows results to games in the selected series', async ({ page, request }) => {
+    const seriesA = e2eTitle('Series Alpha');
+    const seriesB = e2eTitle('Series Beta');
+    const inSeriesTitle = e2eTitle('in series alpha');
+    const otherSeriesTitle = e2eTitle('in series beta');
+    const inId = await seedGame(request, { title: inSeriesTitle, minPlayers: 2, maxPlayers: 2, seriesName: seriesA });
+    const otherId = await seedGame(request, { title: otherSeriesTitle, minPlayers: 2, maxPlayers: 2, seriesName: seriesB });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+
+      const seriesField = page.locator('.field', { hasText: 'Series' });
+      await expect(seriesField.getByRole('button', { name: seriesA, exact: true })).toBeVisible();
+      await seriesField.getByRole('button', { name: seriesA, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+
+      await expect(page.locator('li.suggestion', { hasText: inSeriesTitle })).toBeVisible();
+      await expect(page.locator('li.suggestion', { hasText: otherSeriesTitle })).not.toBeVisible();
+    } finally {
+      await deleteGame(request, inId);
+      await deleteGame(request, otherId);
+    }
+  });
+
+  test('shows an error banner when the suggest request fails', async ({ page }) => {
+    await page.route('**/api/suggestions', (route) => {
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Simulated suggestion failure' }) });
+    });
+
+    await page.goto('/suggest');
+    await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+    await page.getByRole('button', { name: 'Suggest' }).click();
+
+    await expect(page.getByRole('alert')).toHaveText('Simulated suggestion failure');
+  });
+
   test('valid criteria return a matching seeded game', async ({ page, request }) => {
     // A distinctive category avoids matching anything already in the real
     // collection this suite runs against.
