@@ -48,6 +48,21 @@ test.describe('Add / edit game form', () => {
     expect(badTime.status()).toBe(400);
   });
 
+  test('backend rejects an invalid range on update (PUT), not just create', async ({ request }) => {
+    // The create-path check above doesn't prove update() re-validates — GameService.update()
+    // merges fields onto an existing entity rather than constructing a fresh one, so this is
+    // a genuinely separate code path worth covering on its own.
+    const title = e2eTitle('bad range via put');
+    const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2, minPlayTimeMinutes: 30, maxPlayTimeMinutes: 60 });
+
+    const response = await request.put(`/api/games/${id}`, {
+      data: { title, minPlayers: 5, maxPlayers: 2, minPlayTimeMinutes: 30, maxPlayTimeMinutes: 60, categories: [], mechanics: [] }
+    });
+    expect(response.status()).toBe(400);
+
+    await deleteGame(request, id);
+  });
+
   test('shows a series suggestion when a similar title exists, and accepting it links both games', async ({ page, request }) => {
     const existingTitle = e2eTitle('Wordsmith Deluxe');
     const existingId = await seedGame(request, { title: existingTitle });
@@ -97,9 +112,10 @@ test.describe('Add / edit game form', () => {
     await deleteGame(request, existingId);
   });
 
-  test('adds a custom category tag via the combobox and can rename/remove it', async ({ page }) => {
+  test('custom category tags support add/rename/cancel-rename/remove, and only the survivors persist through save', async ({ page, request }) => {
     const title = e2eTitle('custom tag flow');
     const customCategory = `Homebrew ${Math.random().toString(36).slice(2, 6)}`;
+    const toBeRemoved = `Discarded ${Math.random().toString(36).slice(2, 6)}`;
 
     await page.goto('/games/add');
     await page.getByPlaceholder('Game Title').fill(title);
@@ -107,24 +123,46 @@ test.describe('Add / edit game form', () => {
     await page.getByRole('group', { name: 'Play time' }).getByRole('button', { name: '30m', exact: true }).click();
 
     const input = page.getByPlaceholder('Search or add category…');
-    await input.fill(customCategory);
-    const addOption = page.getByRole('option', { name: `Add "${customCategory}"` });
-    await expect(addOption).toBeVisible();
-    await addOption.click();
+    for (const name of [customCategory, toBeRemoved]) {
+      await input.fill(name);
+      const addOption = page.getByRole('option', { name: `Add "${name}"` });
+      await expect(addOption).toBeVisible();
+      await addOption.click();
+    }
 
     const customTag = page.locator('.custom-tag-item', { hasText: customCategory });
     await expect(customTag).toBeVisible();
 
-    // Rename it.
+    // Start a rename, then cancel with Escape — the name should be unchanged.
+    await customTag.getByTitle('Rename').click();
+    await page.locator('.custom-tag-input').fill('Should Not Stick');
+    await page.locator('.custom-tag-input').press('Escape');
+    await expect(page.locator('.custom-tag-item', { hasText: customCategory })).toBeVisible();
+    await expect(page.getByText('Should Not Stick')).not.toBeVisible();
+
+    // Rename it for real, this time confirming with Enter.
     const renamed = `${customCategory} Renamed`;
     await customTag.getByTitle('Rename').click();
     await page.locator('.custom-tag-input').fill(renamed);
     await page.locator('.custom-tag-input').press('Enter');
     await expect(page.locator('.custom-tag-item', { hasText: renamed })).toBeVisible();
 
-    // Remove it.
-    await page.locator('.custom-tag-item', { hasText: renamed }).getByTitle('Remove').click();
-    await expect(page.locator('.custom-tag-item')).toHaveCount(0);
+    // Remove the other tag entirely before saving.
+    await page.locator('.custom-tag-item', { hasText: toBeRemoved }).getByTitle('Remove').click();
+    await expect(page.getByText(toBeRemoved)).not.toBeVisible();
+
+    // Save and confirm the backend actually persisted the renamed tag and never saw the
+    // removed one — not just the in-memory draft.
+    await page.getByRole('button', { name: 'Save game' }).click();
+    await expect(page).toHaveURL(/\/collection/);
+    const games = await (await request.get('/api/games')).json();
+    const saved = games.find((g: { title: string }) => g.title === title);
+    expect(saved).toBeTruthy();
+    expect(saved.categories).toContain(renamed);
+    expect(saved.categories).not.toContain(toBeRemoved);
+    expect(saved.categories).not.toContain(customCategory);
+
+    await deleteGame(request, saved.id);
   });
 
   test('complexity button group selects a value and its info dialog opens', async ({ page }) => {
@@ -140,7 +178,8 @@ test.describe('Add / edit game form', () => {
 
   test('shows an error instead of a blank form when editing a nonexistent game', async ({ page }) => {
     await page.goto('/games/999999999/edit');
-    await expect(page.getByRole('alert')).toBeVisible();
+    // The exact backend message, not just "some alert" — see GameNotFoundException.
+    await expect(page.getByRole('alert')).toHaveText('Game not found: 999999999');
   });
 
   test('BGG import search degrades to "no matches" gracefully (no token configured in this dev environment)', async ({ page }) => {
@@ -192,7 +231,8 @@ test.describe('Add / edit game form', () => {
 
     await expect(page).toHaveURL(/\/collection/);
     const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
-    await expect(row).toContainText('9');
+    // td order: Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
+    await expect(row.locator('td').nth(6)).toHaveText('9');
 
     await deleteGame(request, id);
   });

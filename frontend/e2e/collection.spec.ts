@@ -29,7 +29,8 @@ test.describe('Collection page', () => {
     const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
     await expect(row).toBeVisible();
     await expect(row).toContainText('2–4');
-    await expect(row).toContainText('8');
+    // td order: Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
+    await expect(row.locator('td').nth(6)).toHaveText('8');
   });
 
   test('search filters the table by title', async ({ page }) => {
@@ -199,14 +200,41 @@ test.describe('Collection page sorting', () => {
     await page.locator('.sort-btn').click();
     await page.getByRole('button', { name: 'Favorites first' }).click();
 
-    const titleButtons = page.locator('tbody tr .title-btn');
     const favoriteRow = page.locator('tr', { has: page.getByRole('button', { name: aTitle }) });
     const nonFavoriteRow = page.locator('tr', { has: page.getByRole('button', { name: zTitle }) });
 
     const favoriteIndex = await favoriteRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
     const nonFavoriteIndex = await nonFavoriteRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
     expect(favoriteIndex).toBeLessThan(nonFavoriteIndex);
-    void titleButtons;
+  });
+
+  test('most-played sort orders by play count, and title Z-A reverses alphabetical order', async ({ page, request }) => {
+    const lowTitle = e2eTitle('Aaa Rarely Played');
+    const highTitle = e2eTitle('Zzz Often Played');
+    const lowId = await seedGame(request, { title: lowTitle });
+    const highId = await seedGame(request, { title: highTitle });
+    ids.push(lowId, highId);
+    await request.post(`/api/games/${highId}/plays`, { data: {} });
+    await request.post(`/api/games/${highId}/plays`, { data: {} });
+    await request.post(`/api/games/${lowId}/plays`, { data: {} });
+
+    await page.goto('/collection');
+    await page.locator('.sort-btn').click();
+    await page.getByRole('button', { name: 'Most played' }).click();
+
+    const highRow = page.locator('tr', { has: page.getByRole('button', { name: highTitle }) });
+    const lowRow = page.locator('tr', { has: page.getByRole('button', { name: lowTitle }) });
+    const highIndex = await highRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    const lowIndex = await lowRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    // highTitle (2 plays) should rank above lowTitle (1 play) despite sorting after it alphabetically.
+    expect(highIndex).toBeLessThan(lowIndex);
+
+    // Title (Z-A) should reverse that: lowTitle ("Aaa...") now sorts after highTitle ("Zzz...").
+    await page.locator('.sort-btn').click();
+    await page.getByRole('button', { name: 'Title (Z–A)' }).click();
+    const highIndexZA = await highRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    const lowIndexZA = await lowRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    expect(highIndexZA).toBeLessThan(lowIndexZA);
   });
 
   test('sort dropdown closes when clicking outside it', async ({ page }) => {
@@ -216,5 +244,17 @@ test.describe('Collection page sorting', () => {
 
     await page.locator('h1', { hasText: 'Collection' }).click();
     await expect(page.locator('.sort-dropdown')).not.toBeVisible();
+  });
+});
+
+test.describe('Collection page error handling', () => {
+  test('shows an error banner when the games list fails to load', async ({ page }) => {
+    await page.route('**/api/games', (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'Simulated collection load failure' }) });
+    });
+
+    await page.goto('/collection');
+    await expect(page.getByRole('alert')).toHaveText('Simulated collection load failure');
   });
 });
