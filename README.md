@@ -38,7 +38,7 @@ cd backend
 ./mvnw spring-boot:run
 ```
 
-API is served at `http://localhost:8080`. Flyway runs migrations on startup (including seed data); JPA validates the schema against entities (`ddl-auto=validate`).
+API is served at `http://localhost:8080`. Flyway runs migrations on startup (including seed data); JPA validates the schema against entities (`ddl-auto=validate`). Interactive API docs (springdoc-openapi) at `http://localhost:8080/swagger-ui/index.html`, raw spec at `/v3/api-docs`.
 
 ### 3. Run the frontend
 
@@ -88,7 +88,7 @@ game-tracker/
 │     ├─ game/              # entity, repo, controller, service
 │     ├─ bgg/               # BggClient, DTOs, XML mapping
 │     ├─ suggestion/        # SuggestionService, criteria, scoring
-│     └─ config/            # CORS, caching, clock, SPA fallback
+│     └─ config/            # CORS, caching, clock, SPA fallback, OpenAPI
 └─ frontend/                # Angular
    └─ src/app/
       ├─ games/             # game-list, game-form
