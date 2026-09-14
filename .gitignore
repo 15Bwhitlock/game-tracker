@@ -21,3 +21,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Editor / tool-local settings (per-machine, not project config)
+.claude/settings.local.json
+.vscode/settings.json
