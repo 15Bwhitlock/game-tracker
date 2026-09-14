@@ -589,6 +589,34 @@
   font-size: 0.85rem;
 }
 
+.bgg-import__row {
+  display: flex;
+  gap: 0.5rem;
+
+  input { flex: 1; }
+}
+
+.bgg-import__status {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+}
+
+.bgg-import__confirm {
+  margin: 0.5rem 0 0;
+  padding: 0.5rem 0.75rem;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-dim-strong);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+
+  strong { color: var(--text-primary); }
+}
+
 .custom-tag-input {
   flex: 1;
   padding: 0.2rem 0.5rem;

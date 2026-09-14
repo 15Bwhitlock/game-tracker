@@ -3,10 +3,10 @@ import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } fr
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Observable, forkJoin } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 
-import { GameApi, GamePlay } from '@shared/api';
-import { Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
+import { BggApi, GameApi, GamePlay } from '@shared/api';
+import { BggSearchHit, Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
 import { describeHttpError, formatTime, formatDate } from '@shared/services';
 
 interface TagSuggestion {
@@ -44,6 +44,28 @@ function titlesSimilar(a: string, b: string): boolean {
   return words(b).some(w => aWords.has(w));
 }
 
+// BGG's player/time/complexity fields are free-form numbers; ours are limited to the
+// discrete button-group options (see game-constants.ts). Snap an imported value onto
+// the nearest one so the form's buttons actually light up instead of silently holding
+// an unrepresentable value.
+function snapPlayerCount(n: number | null): number | null {
+  if (n == null) return null;
+  if (n > 10) return PLAYERS_UNLIMITED;
+  return Math.max(1, Math.round(n));
+}
+
+function snapPlayTime(n: number | null): number | null {
+  if (n == null) return null;
+  if (n > 240) return TIME_UNLIMITED;
+  const buckets = TIME_OPTIONS.filter(t => t !== TIME_UNLIMITED);
+  return buckets.reduce((closest, t) => (Math.abs(t - n) < Math.abs(closest - n) ? t : closest), buckets[0]);
+}
+
+function snapComplexity(n: number | null): number | null {
+  if (n == null) return null;
+  return Math.min(5, Math.max(1, Math.round(n)));
+}
+
 @Component({
   selector: 'app-game-form',
   imports: [FormsModule],
@@ -52,8 +74,20 @@ function titlesSimilar(a: string, b: string): boolean {
 })
 export class GameForm implements OnInit {
   private readonly api = inject(GameApi);
+  private readonly bggApi = inject(BggApi);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
+
+  // BoardGameGeek search/import — only offered when adding a new game (see
+  // game-form.html's `@if (!editId())`), since it's meant to fill in a blank form,
+  // not overwrite one you're already editing.
+  readonly bggQuery = signal('');
+  readonly bggResults = signal<BggSearchHit[]>([]);
+  readonly bggSearching = signal(false);
+  readonly bggSearched = signal(false);
+  readonly bggImporting = signal(false);
+  readonly bggError = signal<string | null>(null);
+  readonly bggImportedHit = signal<BggSearchHit | null>(null);
 
   readonly editId = signal<number | null>(null);
   readonly loading = signal(false);
@@ -315,6 +349,76 @@ export class GameForm implements OnInit {
     }
   }
 
+  onBggQueryChange(value: string): void {
+    this.bggQuery.set(value);
+    // A stale result list or "no matches" message from a previous query would be
+    // misleading once the user starts typing something new.
+    this.bggResults.set([]);
+    this.bggSearched.set(false);
+    this.bggError.set(null);
+  }
+
+  onBggSearchKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.searchBgg();
+    }
+  }
+
+  searchBgg(): void {
+    const query = this.bggQuery().trim();
+    if (!query) return;
+    this.bggSearching.set(true);
+    this.bggError.set(null);
+    this.bggApi.search(query).subscribe({
+      next: (hits) => {
+        this.bggResults.set(hits);
+        this.bggSearched.set(true);
+        this.bggSearching.set(false);
+      },
+      error: (err) => {
+        this.bggError.set(describeHttpError(err));
+        this.bggSearching.set(false);
+      }
+    });
+  }
+
+  importBggGame(hit: BggSearchHit): void {
+    this.bggImporting.set(true);
+    this.bggError.set(null);
+    this.bggApi.details(hit.bggId).subscribe({
+      next: (details) => {
+        this.draft.update(d => ({
+          ...d,
+          bggId: details.bggId,
+          title: details.title || d.title,
+          minPlayers: snapPlayerCount(details.minPlayers) ?? d.minPlayers,
+          maxPlayers: snapPlayerCount(details.maxPlayers) ?? d.maxPlayers,
+          minPlayTimeMinutes: snapPlayTime(details.minPlayTimeMinutes) ?? d.minPlayTimeMinutes,
+          maxPlayTimeMinutes: snapPlayTime(details.maxPlayTimeMinutes) ?? d.maxPlayTimeMinutes,
+          complexityWeight: snapComplexity(details.complexityWeight) ?? d.complexityWeight,
+          categories: details.categories.length > 0 ? details.categories : d.categories,
+          mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
+          thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
+        }));
+        this.bggImportedHit.set(hit);
+        this.bggResults.set([]);
+        this.bggSearched.set(false);
+        this.bggQuery.set('');
+        this.bggImporting.set(false);
+      },
+      error: (err) => {
+        this.bggError.set(describeHttpError(err));
+        this.bggImporting.set(false);
+      }
+    });
+  }
+
+  clearBggImport(): void {
+    this.bggImportedHit.set(null);
+    this.draft.update(d => ({ ...d, bggId: null }));
+  }
+
   save(): void {
     this.draft.update(d => ({ ...d, title: toTitleCase(d.title) }));
     const game = this.draft();
@@ -352,10 +456,21 @@ export class GameForm implements OnInit {
       ...(seriesTarget ? [this.api.updateSeriesName(seriesTarget.gameId, seriesTarget.seriesName)] : []),
     ];
 
-    const mainRequest: Observable<unknown> = id ? this.api.update(id, game) : this.api.create(game);
-    const pipeline: Observable<unknown> = followUps.length > 0
-      ? mainRequest.pipe(switchMap(() => forkJoin(followUps)))
-      : mainRequest;
+    const mainRequest: Observable<Game> = id ? this.api.update(id, game) : this.api.create(game);
+    // If the main save succeeds but a follow-up (series patch / play removal) then fails,
+    // we'd otherwise stay on the form with no way to retry except re-submitting — which for
+    // a *new* game means POSTing a second, duplicate record. Adopt the id the server just
+    // assigned as soon as the main request succeeds, so a retry after a follow-up failure
+    // becomes a PUT (update) instead of another POST (create).
+    const pipeline: Observable<unknown> = mainRequest.pipe(
+      tap((saved) => {
+        if (!id && saved.id != null) {
+          this.editId.set(saved.id);
+          this.draft.update(d => ({ ...d, id: saved.id }));
+        }
+      }),
+      switchMap((saved) => followUps.length > 0 ? forkJoin(followUps) : [saved])
+    );
 
     const backNav = () => this.router.navigate(['/collection'], { queryParams: this.returnSearch ? { search: this.returnSearch } : {} });
 
