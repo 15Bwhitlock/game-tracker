@@ -133,7 +133,7 @@ cd frontend && npm run test:e2e        # headless
 cd frontend && npm run test:e2e:ui     # Playwright's interactive UI mode
 ```
 
-Covers the collection, add/edit form, suggestions, and dictionary pages end-to-end against the real dev backend — see [PLAN.md](PLAN.md)'s Testing strategy section for how it isolates itself from your actual collection data and why `workers: 1` is required.
+48 tests covering the collection, add/edit form, suggestions, dictionary, and app shell (theme/nav/404) pages end-to-end against the real dev backend, plus direct API checks for endpoints with no UI path — see [PLAN.md](PLAN.md)'s Testing strategy section for how it isolates itself from your actual collection data and why `workers: 1` is required.
 
 ## Status
 

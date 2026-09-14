@@ -23,4 +23,15 @@ test.describe('Dictionary page', () => {
     await expect(page.getByText(/No categories match/)).toBeVisible();
     await expect(page.getByText(/No mechanics match/)).toBeVisible();
   });
+
+  test('search also matches definition/description text, not just names', async ({ page }) => {
+    await page.goto('/dictionary');
+    const search = page.getByPlaceholder('Search categories, mechanics, glossary…');
+
+    // "perfect information" appears only in the Abstract category's description
+    // (game-categories.ts), never in a name — this only passes if description
+    // text is actually searched, not just the term/category/mechanic name.
+    await search.fill('perfect information');
+    await expect(page.locator('.entry__name', { hasText: 'Abstract' })).toBeVisible();
+  });
 });

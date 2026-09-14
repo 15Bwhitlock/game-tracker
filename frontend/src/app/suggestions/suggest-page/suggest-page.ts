@@ -48,6 +48,13 @@ export class SuggestPage implements OnInit {
   readonly loading = signal(false);
   readonly loadingMore = signal(false);
   readonly error = signal<string | null>(null);
+  // Distinct from `hasResults` — this tracks whether a search has actually run at
+  // all, so the results card (and its "nothing fits" message) only ever appears
+  // once there's something to report, but *does* appear even when that report is
+  // "zero games matched" (previously, gating the whole card on results/totalCount
+  // being non-zero made the empty-state message unreachable: a zero-result search
+  // looked identical to never having searched).
+  readonly hasSearched = signal(false);
   readonly hasMore = computed(() => this.results().length < this.totalCount());
   readonly hasResults = computed(() => this.results().length > 0);
 
@@ -198,10 +205,11 @@ export class SuggestPage implements OnInit {
     effect(() => {
       this.draft();
       untracked(() => {
-        if (this.results().length > 0) {
+        if (this.hasSearched()) {
           this.results.set([]);
           this.totalCount.set(0);
           this.currentPage.set(0);
+          this.hasSearched.set(false);
         }
       });
     });
@@ -410,6 +418,7 @@ export class SuggestPage implements OnInit {
       next: (page: SuggestionPage) => {
         this.results.set(page.items);
         this.totalCount.set(page.totalCount);
+        this.hasSearched.set(true);
         this.loading.set(false);
       },
       error: (err) => {
@@ -438,6 +447,7 @@ export class SuggestPage implements OnInit {
     this.results.set([]);
     this.totalCount.set(0);
     this.currentPage.set(0);
+    this.hasSearched.set(false);
     this.error.set(null);
   }
 }

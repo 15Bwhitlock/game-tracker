@@ -14,7 +14,9 @@ test.describe('Collection page', () => {
       minPlayTimeMinutes: 30,
       maxPlayTimeMinutes: 60,
       personalRating: 8,
-      categories: ['Strategy']
+      categories: ['Strategy'],
+      mechanics: ['Hand Management'],
+      notes: 'A note only this seeded game should have.'
     });
   });
 
@@ -42,6 +44,49 @@ test.describe('Collection page', () => {
     await expect(page.getByRole('button', { name: title })).not.toBeVisible();
   });
 
+  test('search matches by category, mechanic, and notes text', async ({ page }) => {
+    await page.goto('/collection');
+    const search = page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…');
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+
+    await search.fill('Strategy');
+    await expect(row).toBeVisible();
+
+    await search.fill('Hand Management');
+    await expect(row).toBeVisible();
+
+    await search.fill('only this seeded game should have');
+    await expect(row).toBeVisible();
+  });
+
+  test('search matches by numeric player count and play time', async ({ page }) => {
+    await page.goto('/collection');
+    const search = page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…');
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+
+    // 3 falls inside this game's 2-4 player range.
+    await search.fill('3');
+    await expect(row).toBeVisible();
+
+    // 45 falls inside its 30-60 minute range.
+    await search.fill('45');
+    await expect(row).toBeVisible();
+  });
+
+  test('search suggestions dropdown lists matching titles and categories', async ({ page }) => {
+    await page.goto('/collection');
+    const search = page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…');
+
+    await search.fill(title.slice(0, -2));
+    const suggestions = page.locator('.search-suggestions');
+    await expect(suggestions).toBeVisible();
+    // Suggestion items use role="option" (a listbox), not the default button role.
+    await expect(suggestions.getByRole('option', { name: title })).toBeVisible();
+
+    await suggestions.getByRole('option', { name: title }).click();
+    await expect(search).toHaveValue(title);
+  });
+
   test('log play increments the play count', async ({ page }) => {
     await page.goto('/collection');
     const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
@@ -50,6 +95,55 @@ test.describe('Collection page', () => {
     await row.getByTitle('Log play').click();
     await expect(row.locator('.plays-cell')).toHaveText('1');
     await expect(row.getByTitle('Logged!')).toBeVisible();
+  });
+
+  test('undo on the log-play toast reverts the play count', async ({ page }) => {
+    await page.goto('/collection');
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+
+    await row.getByTitle('Log play').click();
+    await expect(row.locator('.plays-cell')).toHaveText('1');
+
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(row.locator('.plays-cell')).toHaveText('0');
+    await expect(row.getByTitle('Log play')).toBeVisible();
+  });
+
+  test('toggling the favorite star updates the row and persists', async ({ page }) => {
+    await page.goto('/collection');
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+    const star = row.locator('.star-btn');
+
+    await expect(star).toHaveText('☆');
+    await star.click();
+    await expect(star).toHaveText('★');
+
+    // Reload to confirm it was actually persisted, not just a local UI flip.
+    await page.reload();
+    await expect(row.locator('.star-btn')).toHaveText('★');
+  });
+
+  test('opens the detail modal with full game details and play history', async ({ page }) => {
+    await page.goto('/collection');
+    await page.getByRole('button', { name: title }).click();
+
+    const dialog = page.locator('dialog.modal--detail');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: title })).toBeVisible();
+    await expect(dialog).toContainText('2–4');
+    await expect(dialog).toContainText('8 / 10');
+    await expect(dialog.locator('.tag', { hasText: 'Strategy' })).toBeVisible();
+    await expect(dialog.locator('.tag', { hasText: 'Hand Management' })).toBeVisible();
+    await expect(dialog).toContainText('No plays recorded yet.');
+
+    // Toggling favorite from inside the modal should update it in place.
+    await dialog.locator('.btn--star').click();
+    await expect(dialog.locator('.btn--star')).toHaveText('★');
+
+    await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).not.toBeVisible();
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+    await expect(row.locator('.star-btn')).toHaveText('★');
   });
 
   test('delete requires confirmation', async ({ page }) => {
@@ -70,5 +164,57 @@ test.describe('Collection page', () => {
     await row.getByTitle('Delete').click();
     await page.locator('dialog.modal', { hasText: 'Delete game?' }).getByRole('button', { name: 'Delete' }).click();
     await expect(page.getByRole('button', { name: title })).not.toBeVisible();
+  });
+
+  test('editing preserves the current search term across navigation', async ({ page }) => {
+    await page.goto('/collection');
+    const search = page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…');
+    await search.fill(title);
+
+    const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+    await row.getByTitle('Edit').click();
+
+    await expect(page).toHaveURL(new RegExp(`/games/${gameId}/edit\\?search=`));
+    await page.locator('.page__header').getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page).toHaveURL(/\/collection\?search=/);
+    await expect(page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…')).toHaveValue(title);
+  });
+});
+
+test.describe('Collection page sorting', () => {
+  const ids: number[] = [];
+
+  test.afterEach(async ({ request }) => {
+    await Promise.all(ids.splice(0).map((id) => deleteGame(request, id)));
+  });
+
+  test('favorites-first sort puts the favorited game above a non-favorite, alphabetically otherwise', async ({ page, request }) => {
+    const zTitle = e2eTitle('Zzz Non Favorite');
+    const aTitle = e2eTitle('Aaa Favorite');
+    ids.push(await seedGame(request, { title: zTitle }));
+    ids.push(await seedGame(request, { title: aTitle, favorite: true }));
+
+    await page.goto('/collection');
+    await page.locator('.sort-btn').click();
+    await page.getByRole('button', { name: 'Favorites first' }).click();
+
+    const titleButtons = page.locator('tbody tr .title-btn');
+    const favoriteRow = page.locator('tr', { has: page.getByRole('button', { name: aTitle }) });
+    const nonFavoriteRow = page.locator('tr', { has: page.getByRole('button', { name: zTitle }) });
+
+    const favoriteIndex = await favoriteRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    const nonFavoriteIndex = await nonFavoriteRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+    expect(favoriteIndex).toBeLessThan(nonFavoriteIndex);
+    void titleButtons;
+  });
+
+  test('sort dropdown closes when clicking outside it', async ({ page }) => {
+    await page.goto('/collection');
+    await page.locator('.sort-btn').click();
+    await expect(page.locator('.sort-dropdown')).toBeVisible();
+
+    await page.locator('h1', { hasText: 'Collection' }).click();
+    await expect(page.locator('.sort-dropdown')).not.toBeVisible();
   });
 });
