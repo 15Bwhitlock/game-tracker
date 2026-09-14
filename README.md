@@ -4,7 +4,7 @@ A personal web app to catalog board games and recommend what to play with friend
 
 ## Stack
 
-- **Backend** — Java 17, Spring Boot 3.4, Maven, PostgreSQL 15, Flyway
+- **Backend** — Java 17, Spring Boot 3.5, Maven, PostgreSQL 15, Flyway
 - **Frontend** — Angular 21 (standalone components, signals)
 - **Integrations** — BoardGameGeek XML API2 (Caffeine-cached, 24h TTL)
 
@@ -67,6 +67,7 @@ App is served at `http://localhost:4200`. `/api/*` requests are proxied to the b
 | GET | `/api/games/{id}` | detail |
 | POST | `/api/games` | add |
 | PUT | `/api/games/{id}` | edit |
+| PATCH | `/api/games/{id}/favorite` | toggle favorite flag |
 | DELETE | `/api/games/{id}` | remove |
 | POST | `/api/games/{id}/plays` | log a play |
 | DELETE | `/api/games/{id}/plays/{playId}` | undo a logged play |
@@ -119,7 +120,14 @@ cd backend && ./mvnw test
 - BGG XML parsing — tests against saved fixtures in `src/test/resources/bgg/`.
 - Repository tests — Testcontainers with real Postgres 15.
 
-Frontend tests are intentionally skipped until a recurring bug warrants them.
+Angular unit tests are still skipped in favor of the e2e suite below. With Postgres + the backend running (steps 1–2 above):
+
+```bash
+cd frontend && npm run test:e2e        # headless
+cd frontend && npm run test:e2e:ui     # Playwright's interactive UI mode
+```
+
+Covers the collection, add/edit form, suggestions, and dictionary pages end-to-end against the real dev backend — see [PLAN.md](PLAN.md)'s Testing strategy section for how it isolates itself from your actual collection data and why `workers: 1` is required.
 
 ## Status
 

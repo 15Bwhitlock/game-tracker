@@ -1,0 +1,89 @@
+import { APIRequestContext, expect } from '@playwright/test';
+
+/**
+ * Helpers for seeding/cleaning up games through the real backend API.
+ *
+ * These tests run against the actual dev backend + Postgres database (there's
+ * no separate test profile for a personal project this size — see
+ * PLAN.md's testing strategy). To avoid polluting the real collection, every
+ * game created here gets a title prefixed with E2E_TITLE_PREFIX and is
+ * deleted in an afterEach/afterAll hook. Never assert against the full
+ * collection list — always scope assertions to games this run created.
+ */
+export const E2E_TITLE_PREFIX = 'E2e';
+
+/**
+ * GameForm title-cases the title on save (see toTitleCase in game-form.ts:
+ * capitalize each word's first letter, leave the rest as-is). Games created
+ * directly via the API skip that transform. To make titles compare equal
+ * either way, generate them already in that same shape.
+ */
+function titleCase(s: string): string {
+  return s
+    .trim()
+    .split(' ')
+    .filter((w) => w.length > 0)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+export function e2eTitle(name: string): string {
+  // A random suffix keeps titles unique across parallel test workers/runs.
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return titleCase(`${E2E_TITLE_PREFIX} ${name} ${suffix}`);
+}
+
+export interface SeedGameOptions {
+  title: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  minPlayTimeMinutes?: number;
+  maxPlayTimeMinutes?: number;
+  complexityWeight?: number | null;
+  categories?: string[];
+  mechanics?: string[];
+  personalRating?: number | null;
+  notes?: string | null;
+  favorite?: boolean;
+  seriesName?: string | null;
+}
+
+/** Creates a game via POST /api/games and returns its id. */
+export async function seedGame(request: APIRequestContext, options: SeedGameOptions): Promise<number> {
+  const response = await request.post('/api/games', {
+    data: {
+      title: options.title,
+      minPlayers: options.minPlayers ?? 2,
+      maxPlayers: options.maxPlayers ?? 4,
+      minPlayTimeMinutes: options.minPlayTimeMinutes ?? 30,
+      maxPlayTimeMinutes: options.maxPlayTimeMinutes ?? 60,
+      complexityWeight: options.complexityWeight ?? null,
+      categories: options.categories ?? [],
+      mechanics: options.mechanics ?? [],
+      personalRating: options.personalRating ?? null,
+      notes: options.notes ?? null,
+      favorite: options.favorite ?? false,
+      seriesName: options.seriesName ?? null
+    }
+  });
+  expect(response.ok(), `seedGame failed: ${response.status()} ${await response.text()}`).toBeTruthy();
+  const body = await response.json();
+  return body.id as number;
+}
+
+/** Deletes a game by id; tolerates it already being gone. */
+export async function deleteGame(request: APIRequestContext, id: number): Promise<void> {
+  const response = await request.delete(`/api/games/${id}`);
+  if (!response.ok() && response.status() !== 404) {
+    throw new Error(`deleteGame(${id}) failed: ${response.status()} ${await response.text()}`);
+  }
+}
+
+/** Deletes every game whose title starts with the e2e prefix. Use as a safety-net afterAll. */
+export async function deleteAllE2eGames(request: APIRequestContext): Promise<void> {
+  const response = await request.get('/api/games');
+  expect(response.ok()).toBeTruthy();
+  const games = (await response.json()) as Array<{ id: number; title: string }>;
+  const stray = games.filter((g) => g.title.startsWith(E2E_TITLE_PREFIX));
+  await Promise.all(stray.map((g) => deleteGame(request, g.id)));
+}
