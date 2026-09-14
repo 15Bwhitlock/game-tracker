@@ -11,6 +11,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.DecimalMax;
 import org.hibernate.annotations.Formula;
 import jakarta.validation.constraints.DecimalMin;
@@ -166,4 +168,21 @@ public class Game {
 
     public String getSeriesName() { return seriesName; }
     public void setSeriesName(String seriesName) { this.seriesName = seriesName; }
+
+    // Cross-field checks Bean Validation can't express with per-field annotations alone.
+    // @Transient + @JsonIgnore keep these out of the JPA mapping and the JSON response —
+    // they exist purely to be picked up by @Valid during create/update.
+    @AssertTrue(message = "Minimum players must not be greater than maximum players")
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isPlayerRangeValid() {
+        return minPlayers <= maxPlayers;
+    }
+
+    @AssertTrue(message = "Minimum play time must not be greater than maximum play time")
+    @Transient
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    public boolean isPlayTimeRangeValid() {
+        return minPlayTimeMinutes <= maxPlayTimeMinutes;
+    }
 }

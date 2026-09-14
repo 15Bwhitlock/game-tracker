@@ -47,5 +47,12 @@ export const routes: Routes = [
     path: 'dictionary',
     loadComponent: () =>
       import('./dictionary/dictionary-page/dictionary-page').then((m) => m.DictionaryPage)
+  },
+
+  // Catch-all — must stay last. Anything not matched above (typo'd URL, stale
+  // bookmark, deleted route) gets a real 404 page instead of a blank <main>.
+  {
+    path: '**',
+    loadComponent: () => import('./shared/not-found/not-found-page').then((m) => m.NotFoundPage)
   }
 ];

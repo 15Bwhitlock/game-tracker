@@ -10,6 +10,68 @@
     <div class="alert alert--error" role="alert">{{ formError() }}</div>
   }
 
+  @if (!editId()) {
+    <div class="card bgg-import">
+      <div class="field field--wide">
+        <span>
+          Import from BoardGameGeek
+          <span class="field__optional">optional</span>
+        </span>
+        <div class="tag-combobox bgg-import__row">
+          <input
+            type="text"
+            name="bggSearch"
+            [ngModel]="bggQuery()"
+            (ngModelChange)="onBggQueryChange($event)"
+            (keydown)="onBggSearchKeydown($event)"
+            [ngModelOptions]="{ standalone: true }"
+            placeholder="Search BoardGameGeek by name…"
+            autocomplete="off"
+          />
+          <button
+            type="button"
+            class="btn btn--ghost btn--sm"
+            (click)="searchBgg()"
+            [disabled]="bggSearching() || !bggQuery().trim()"
+          >{{ bggSearching() ? 'Searching…' : 'Search' }}</button>
+
+          @if (bggResults().length > 0) {
+            <ul class="tag-suggestions" role="listbox">
+              @for (hit of bggResults(); track hit.bggId) {
+                <li class="tag-suggestion-item" role="option" (click)="importBggGame(hit)">
+                  {{ hit.name }}
+                  @if (hit.yearPublished) {
+                    <span class="tag-suggestion-badge">{{ hit.yearPublished }}</span>
+                  }
+                </li>
+              }
+            </ul>
+          }
+        </div>
+
+        @if (bggImporting()) {
+          <p class="muted bgg-import__status">Loading details from BoardGameGeek…</p>
+        }
+        @if (bggSearched() && bggResults().length === 0 && !bggSearching() && !bggError()) {
+          <p class="muted bgg-import__status">No matches on BoardGameGeek.</p>
+        }
+        @if (bggError()) {
+          <div class="alert alert--error bgg-import__status" role="alert">{{ bggError() }}</div>
+        }
+        @if (bggImportedHit()) {
+          <p class="bgg-import__confirm">
+            ✓ Imported <strong>{{ bggImportedHit()?.name }}</strong>
+            @if (bggImportedHit()?.yearPublished) {
+              ({{ bggImportedHit()?.yearPublished }})
+            }
+            — fields below were filled in for you.
+            <button type="button" class="btn btn--ghost btn--sm" (click)="clearBggImport()">Undo</button>
+          </p>
+        }
+      </div>
+    </div>
+  }
+
   <div class="card">
     @if (loading()) {
       <p class="muted">Loading…</p>
