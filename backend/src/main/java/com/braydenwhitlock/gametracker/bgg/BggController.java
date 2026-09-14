@@ -1,5 +1,7 @@
 package com.braydenwhitlock.gametracker.bgg;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,6 +17,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/bgg")
+@Tag(name = "BoardGameGeek", description = "Cached proxy over BGG's XML API2 (24h TTL, Caffeine)")
 public class BggController {
 
     private final BggClient bggClient;
@@ -28,6 +31,7 @@ public class BggController {
      * The frontend uses this to power the add-game autocomplete; full lookup happens via
      * {@link #details(int)} once the user picks a hit.
      */
+    @Operation(summary = "Search BGG by name")
     @GetMapping("/search")
     public List<BggSearchHit> search(@RequestParam("q") String query) {
         return bggClient.search(query);
@@ -36,6 +40,7 @@ public class BggController {
     /**
      * Returns full BGG metadata for a numeric id, or 404 if BGG has no such item.
      */
+    @Operation(summary = "Get full BGG metadata for an id")
     @GetMapping("/{bggId}")
     public ResponseEntity<BggGameDetails> details(@PathVariable int bggId) {
         return bggClient.getDetails(bggId)

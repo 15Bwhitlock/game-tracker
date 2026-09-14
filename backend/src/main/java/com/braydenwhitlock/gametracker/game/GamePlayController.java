@@ -1,5 +1,7 @@
 package com.braydenwhitlock.gametracker.game;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/games/{gameId}/plays")
+@Tag(name = "Plays", description = "Play history for a game — feeds variety scoring in suggestions")
 public class GamePlayController {
 
     private final GameService gameService;
@@ -29,6 +32,7 @@ public class GamePlayController {
         this.playRepository = playRepository;
     }
 
+    @Operation(summary = "Log a play", description = "Defaults to today's date if playedAt is omitted")
     // POST /api/games/{gameId}/plays — records a new play session.
     // The body is optional: if you send { "playedAt": "2025-05-01" } the play
     // is recorded on that date; if the body is absent or playedAt is null,
@@ -42,6 +46,7 @@ public class GamePlayController {
         return gameService.logPlay(gameId, date);
     }
 
+    @Operation(summary = "Undo a logged play")
     // DELETE /api/games/{gameId}/plays/{playId} — removes a specific play.
     // Used for the "Undo" action in the UI, shown briefly after logging a play.
     // Returns the updated Game so the UI can refresh the play count and lastPlayedAt.
@@ -50,6 +55,7 @@ public class GamePlayController {
         return gameService.undoPlay(gameId, playId);
     }
 
+    @Operation(summary = "List play history for a game, newest first")
     // GET /api/games/{gameId}/plays — returns the full play history for a game,
     // sorted newest first. Used in the detail modal and the edit form.
     @GetMapping
