@@ -4,7 +4,7 @@ A personal web app to catalog board games and recommend what to play with friend
 
 ## Stack
 
-- **Backend** — Java 17, Spring Boot 3.5, Maven, PostgreSQL 15, Flyway
+- **Backend** — Java 25, Spring Boot 3.5, Maven, PostgreSQL 15, Flyway
 - **Frontend** — Angular 21 (standalone components, signals)
 - **Integrations** — BoardGameGeek XML API2 (Caffeine-cached, 24h TTL)
 
@@ -18,7 +18,7 @@ A personal web app to catalog board games and recommend what to play with friend
 
 ## Prerequisites
 
-- Java 17
+- Java 25
 - Maven 3.9+
 - Node 20.19+ (Angular CLI is pulled via `npx`, no global install needed)
 - Docker (for Postgres via `docker-compose`)
