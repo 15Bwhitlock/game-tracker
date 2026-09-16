@@ -35,6 +35,7 @@ export function e2eTitle(name: string): string {
 
 export interface SeedGameOptions {
   title: string;
+  bggId?: number | null;
   minPlayers?: number;
   maxPlayers?: number;
   minPlayTimeMinutes?: number;
@@ -53,6 +54,7 @@ export async function seedGame(request: APIRequestContext, options: SeedGameOpti
   const response = await request.post('/api/games', {
     data: {
       title: options.title,
+      bggId: options.bggId ?? null,
       minPlayers: options.minPlayers ?? 2,
       maxPlayers: options.maxPlayers ?? 4,
       minPlayTimeMinutes: options.minPlayTimeMinutes ?? 30,

@@ -102,6 +102,13 @@ export class GameForm implements OnInit {
   readonly bggImporting = signal(false);
   readonly bggError = signal<string | null>(null);
   readonly bggImportedHit = signal<BggSearchHit | null>(null);
+  // A game already in the collection whose bggId matches the one just imported —
+  // a far more reliable duplicate signal than title text, since BGG ids never
+  // vary the way a re-typed or slightly-different-cased title might.
+  readonly bggDuplicateGame = signal<Game | null>(null);
+  readonly ownedBggIds = computed(() =>
+    new Set(this.allGames().map(g => g.bggId).filter((id): id is number => id != null))
+  );
 
   readonly editId = signal<number | null>(null);
   readonly loading = signal(false);
@@ -419,6 +426,7 @@ export class GameForm implements OnInit {
           notes: !d.notes?.trim() && details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);
+        this.bggDuplicateGame.set(this.allGames().find(g => g.bggId === hit.bggId) ?? null);
         this.bggResults.set([]);
         this.bggSearched.set(false);
         this.bggQuery.set('');
@@ -433,7 +441,12 @@ export class GameForm implements OnInit {
 
   clearBggImport(): void {
     this.bggImportedHit.set(null);
+    this.bggDuplicateGame.set(null);
     this.draft.update(d => ({ ...d, bggId: null }));
+  }
+
+  dismissBggDuplicateWarning(): void {
+    this.bggDuplicateGame.set(null);
   }
 
   save(): void {
