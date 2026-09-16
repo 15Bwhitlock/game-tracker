@@ -43,6 +43,9 @@
                   @if (hit.yearPublished) {
                     <span class="tag-suggestion-badge">{{ hit.yearPublished }}</span>
                   }
+                  @if (ownedBggIds().has(hit.bggId)) {
+                    <span class="tag-suggestion-badge" title="Already in your collection">owned</span>
+                  }
                 </li>
               }
             </ul>
@@ -67,6 +70,23 @@
             — fields below were filled in for you.
             <button type="button" class="btn btn--ghost btn--sm" (click)="clearBggImport()">Undo</button>
           </p>
+        }
+        @if (bggDuplicateGame()) {
+          <div class="duplicate-warning">
+            <p class="duplicate-warning__text">
+              <strong>⚠ You already have this game.</strong>
+              "{{ bggDuplicateGame()?.title }}" was imported from the same BoardGameGeek entry.
+            </p>
+            <div class="duplicate-warning__actions">
+              <a
+                [href]="'/games/' + bggDuplicateGame()?.id + '/edit'"
+                target="_blank"
+                rel="noopener"
+                class="btn btn--ghost btn--sm"
+              >View it</a>
+              <button type="button" class="btn btn--ghost btn--sm" (click)="dismissBggDuplicateWarning()">Dismiss</button>
+            </div>
+          </div>
         }
       </div>
     </div>

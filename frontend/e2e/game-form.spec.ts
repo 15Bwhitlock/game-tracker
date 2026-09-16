@@ -182,6 +182,38 @@ test.describe('Add / edit game form', () => {
     await expect(page.getByRole('alert')).toHaveText('Game not found: 999999999');
   });
 
+  test('warns when a BGG import matches a game already in the collection by bggId, even if titles differ', async ({ page, request }) => {
+    // Only meaningful with a real BGG_API_TOKEN configured (see backend/.env) — without
+    // one, every search returns empty and there's nothing to import.
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    // Deliberately a different title from what BGG calls it (13 is BGG's real id for
+    // Catan) — bggId is the reliable duplicate signal here, not title text.
+    const existingTitle = e2eTitle('My Own Name For This');
+    const existingId = await seedGame(request, { title: existingTitle, bggId: 13 });
+
+    try {
+      await page.goto('/games/add');
+      await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+      const option = page.getByRole('option', { name: /^Catan\s/ }).first();
+      await expect(option).toContainText('owned');
+      await option.click();
+
+      const warning = page.locator('.duplicate-warning', { hasText: 'You already have this game' });
+      await expect(warning).toBeVisible();
+      await expect(warning).toContainText(existingTitle);
+
+      await warning.getByRole('button', { name: 'Dismiss' }).click();
+      await expect(warning).not.toBeVisible();
+    } finally {
+      await deleteGame(request, existingId);
+    }
+  });
+
   test('BGG search shows "no matches" for a query nothing could match', async ({ page }) => {
     // A random gibberish string is guaranteed empty regardless of whether a real
     // BGG_API_TOKEN is configured — unlike searching a real game name, this doesn't
