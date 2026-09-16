@@ -183,6 +183,50 @@ test.describe('Collection page', () => {
   });
 });
 
+test.describe('Collection page BGG metadata display', () => {
+  test('shows a thumbnail and year in the row, and the full image and year in the detail modal', async ({ page, request }) => {
+    const title = e2eTitle('Illustrated Game');
+    const id = await seedGame(request, {
+      title,
+      thumbnailUrl: 'https://cf.geekdo-images.com/example/thumb.jpg',
+      imageUrl: 'https://cf.geekdo-images.com/example/full.jpg',
+      yearPublished: 1995
+    });
+
+    try {
+      await page.goto('/collection');
+      const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
+      await expect(row.locator('.title-thumbnail')).toHaveAttribute('src', 'https://cf.geekdo-images.com/example/thumb.jpg');
+      await expect(row.locator('.title-year')).toHaveText('(1995)');
+
+      await page.getByRole('button', { name: title }).click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog.locator('.modal__header-year')).toHaveText('(1995)');
+      await expect(dialog.locator('.detail-image')).toHaveAttribute('src', 'https://cf.geekdo-images.com/example/full.jpg');
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+
+  test('falls back to the thumbnail in the detail modal when no full-size image is set', async ({ page, request }) => {
+    const title = e2eTitle('Thumbnail Only Game');
+    const id = await seedGame(request, {
+      title,
+      thumbnailUrl: 'https://cf.geekdo-images.com/example/thumb-only.jpg'
+    });
+
+    try {
+      await page.goto('/collection');
+      await page.getByRole('button', { name: title }).click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog.locator('.detail-image')).toHaveAttribute('src', 'https://cf.geekdo-images.com/example/thumb-only.jpg');
+      await expect(dialog.locator('.modal__header-year')).toHaveCount(0);
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+});
+
 test.describe('Collection page sorting', () => {
   const ids: number[] = [];
 

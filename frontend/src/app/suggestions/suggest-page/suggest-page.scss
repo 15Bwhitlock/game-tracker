@@ -338,7 +338,22 @@
   gap: 0.75rem;
 }
 
+.suggestion__thumbnail {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  flex-shrink: 0;
+  align-self: center;
+}
+
 .suggestion__title { margin: 0; font-size: 1rem; }
+
+.suggestion__year {
+  font-weight: 400;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+}
 
 .suggestion__score {
   font-variant-numeric: tabular-nums;
@@ -414,6 +429,21 @@
   justify-content: space-between;
 
   h2 { margin: 0; font-size: 1.1rem; color: var(--text-primary); }
+}
+
+.modal__header-year {
+  font-weight: 400;
+  color: var(--text-faint);
+  font-size: 0.95rem;
+}
+
+.detail-image {
+  display: block;
+  max-width: 100%;
+  max-height: 240px;
+  margin: 0 auto;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 .modal__close {

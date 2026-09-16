@@ -36,6 +36,9 @@ export function e2eTitle(name: string): string {
 export interface SeedGameOptions {
   title: string;
   bggId?: number | null;
+  thumbnailUrl?: string | null;
+  imageUrl?: string | null;
+  yearPublished?: number | null;
   minPlayers?: number;
   maxPlayers?: number;
   minPlayTimeMinutes?: number;
@@ -55,6 +58,9 @@ export async function seedGame(request: APIRequestContext, options: SeedGameOpti
     data: {
       title: options.title,
       bggId: options.bggId ?? null,
+      thumbnailUrl: options.thumbnailUrl ?? null,
+      imageUrl: options.imageUrl ?? null,
+      yearPublished: options.yearPublished ?? null,
       minPlayers: options.minPlayers ?? 2,
       maxPlayers: options.maxPlayers ?? 4,
       minPlayTimeMinutes: options.minPlayTimeMinutes ?? 30,
