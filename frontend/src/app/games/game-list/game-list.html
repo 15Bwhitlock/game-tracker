@@ -120,7 +120,13 @@
                   [title]="game.favorite ? 'Remove from favorites' : 'Add to favorites'"
                   (click)="toggleFavorite(game)"
                 >{{ game.favorite ? '★' : '☆' }}</button>
+                @if (game.thumbnailUrl) {
+                  <img class="title-thumbnail" [src]="game.thumbnailUrl" alt="" />
+                }
                 <button type="button" class="title-btn" (click)="openDetail(game)">{{ game.title }}</button>
+                @if (game.yearPublished) {
+                  <span class="title-year">({{ game.yearPublished }})</span>
+                }
               </td>
               <td>
                 @if (game.minPlayers === game.maxPlayers) {
@@ -163,7 +169,12 @@
     @if (selectedGame(); as game) {
       <div class="modal__content">
         <header class="modal__header">
-          <h2>{{ game.title }}</h2>
+          <h2>
+            {{ game.title }}
+            @if (game.yearPublished) {
+              <span class="modal__header-year">({{ game.yearPublished }})</span>
+            }
+          </h2>
           <div class="modal__header-actions">
             <button
               type="button"
@@ -175,6 +186,10 @@
             <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
           </div>
         </header>
+
+        @if (game.imageUrl || game.thumbnailUrl) {
+          <img class="detail-image" [src]="game.imageUrl || game.thumbnailUrl" alt="" />
+        }
 
         <div class="detail-grid">
           <div class="detail-item">

@@ -257,6 +257,17 @@ test.describe('Add / edit game form', () => {
     expect(notes.toLowerCase()).toContain('catan');
     expect(notes).not.toMatch(/&[a-z#0-9]+;/i);
     expect(notes).not.toMatch(/<[a-z][^>]*>/i);
+
+    // Year and the full-size cover image aren't shown as form fields (BGG-sourced, like
+    // the thumbnail), but should still round-trip through a real save.
+    await page.getByRole('button', { name: 'Save game' }).click();
+    await expect(page).toHaveURL(/\/collection/);
+    const games = await (await request.get('/api/games')).json();
+    const saved = games.find((g: { title: string }) => g.title === 'Catan');
+    expect(saved).toBeTruthy();
+    expect(saved.yearPublished).toBe(1995);
+    expect(saved.imageUrl).toMatch(/^https?:\/\//);
+    await deleteGame(request, saved.id);
   });
 
   test('BGG import always overwrites notes with the looked-up game\'s description, even ones typed beforehand', async ({ page, request }) => {

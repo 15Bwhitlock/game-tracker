@@ -79,6 +79,8 @@ public class GameService {
         existing.setCategories(updates.getCategories());
         existing.setMechanics(updates.getMechanics());
         existing.setThumbnailUrl(updates.getThumbnailUrl());
+        existing.setImageUrl(updates.getImageUrl());
+        existing.setYearPublished(updates.getYearPublished());
         existing.setOwnedSince(updates.getOwnedSince());
         existing.setPersonalRating(updates.getPersonalRating());
         existing.setNotes(updates.getNotes());

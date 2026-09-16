@@ -431,6 +431,8 @@ export class GameForm implements OnInit {
           categories: details.categories.length > 0 ? details.categories : d.categories,
           mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
           thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
+          imageUrl: details.imageUrl ?? d.imageUrl,
+          yearPublished: details.yearPublished ?? d.yearPublished,
           notes: details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);

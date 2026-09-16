@@ -241,8 +241,14 @@
               <div class="suggestion__rank">{{ $index + 1 }}</div>
               <div class="suggestion__body">
                 <div class="suggestion__title-row">
+                  @if (sg.game.thumbnailUrl) {
+                    <img class="suggestion__thumbnail" [src]="sg.game.thumbnailUrl" alt="" />
+                  }
                   <h3 class="suggestion__title">
                     <button type="button" class="title-btn" (click)="openDetail(sg.game)">{{ sg.game.title }}</button>
+                    @if (sg.game.yearPublished) {
+                      <span class="suggestion__year">({{ sg.game.yearPublished }})</span>
+                    }
                   </h3>
                   <span class="suggestion__score" title="Suggestion score">{{ sg.score | number:'1.1-1' }}</span>
                 </div>
@@ -300,9 +306,18 @@
     @if (selectedGame(); as game) {
       <div class="modal__content">
         <header class="modal__header">
-          <h2>{{ game.title }}</h2>
+          <h2>
+            {{ game.title }}
+            @if (game.yearPublished) {
+              <span class="modal__header-year">({{ game.yearPublished }})</span>
+            }
+          </h2>
           <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
         </header>
+
+        @if (game.imageUrl || game.thumbnailUrl) {
+          <img class="detail-image" [src]="game.imageUrl || game.thumbnailUrl" alt="" />
+        }
 
         <div class="detail-grid">
           <div class="detail-item">

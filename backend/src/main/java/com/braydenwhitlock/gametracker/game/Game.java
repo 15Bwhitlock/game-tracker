@@ -90,6 +90,14 @@ public class Game {
     @Column(name = "thumbnail_url", length = 1024)
     private String thumbnailUrl;
 
+    // Full-size cover image — distinct from thumbnailUrl (which is small, for list views).
+    @Column(name = "image_url", length = 1024)
+    private String imageUrl;
+
+    // BGG's publication year. Null for manually-added games with no BGG id.
+    @Column(name = "year_published")
+    private Integer yearPublished;
+
     @Column(name = "owned_since")
     private LocalDate ownedSince;
 
@@ -148,6 +156,12 @@ public class Game {
 
     public String getThumbnailUrl() { return thumbnailUrl; }
     public void setThumbnailUrl(String thumbnailUrl) { this.thumbnailUrl = thumbnailUrl; }
+
+    public String getImageUrl() { return imageUrl; }
+    public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+
+    public Integer getYearPublished() { return yearPublished; }
+    public void setYearPublished(Integer yearPublished) { this.yearPublished = yearPublished; }
 
     public LocalDate getOwnedSince() { return ownedSince; }
     public void setOwnedSince(LocalDate ownedSince) { this.ownedSince = ownedSince; }
