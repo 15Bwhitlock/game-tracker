@@ -25,3 +25,7 @@ Thumbs.db
 # Editor / tool-local settings (per-machine, not project config)
 .claude/settings.local.json
 .vscode/settings.json
+
+# Secrets — never commit real tokens/keys. backend/.env holds BGG_API_TOKEN locally.
+.env
+*.env.local
