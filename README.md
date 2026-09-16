@@ -33,16 +33,22 @@ docker compose up -d
 
 ### 2. Run the backend
 
+BGG's XML API2 has required a registered app's bearer token since Oct 2025 — without one, `/api/bgg/*` still works but always returns empty results. Register at [boardgamegeek.com/using_the_xml_api](https://boardgamegeek.com/using_the_xml_api) (requires a BGG account), then put the token in `backend/.env` (gitignored, never commit it):
+
+```bash
+# backend/.env
+export BGG_API_TOKEN=your-token-here
+```
+
+Load it before starting the backend:
+
 ```bash
 cd backend
+source .env
 ./mvnw spring-boot:run
 ```
 
-BGG's XML API2 has required a registered app's bearer token since Oct 2025 — without one, `/api/bgg/*` still works but always returns empty results. To enable it, register at [boardgamegeek.com/using_the_xml_api](https://boardgamegeek.com/using_the_xml_api) (requires a BGG account), then export the token before starting the backend:
-
-```bash
-export BGG_API_TOKEN=your-token-here
-```
+If the backend is already running and you edit code, Spring Boot devtools auto-restarts it — but that restart does *not* reload environment variables. If it was started without `source .env` (or the `.env` file changed), fully stop the process and relaunch with `source .env` again.
 
 API is served at `http://localhost:8080`. Flyway runs migrations on startup (including seed data); JPA validates the schema against entities (`ddl-auto=validate`). Interactive API docs (springdoc-openapi) at `http://localhost:8080/swagger-ui/index.html`, raw spec at `/v3/api-docs`.
 
@@ -62,7 +68,7 @@ App is served at `http://localhost:4200`. `/api/*` requests are proxied to the b
 - **Add / Edit game** (`/games/add`, `/games/:id/edit`) — full form with button-group selectors for player count (1–10+), play time (15m–4h+), personal rating (1–10), and complexity (1–5). Categories and mechanics use a toggle-chip grid (selected items float to the top) with hover tooltips, a reference dialog, and an autocomplete combobox that suggests presets and in-use tags. Also has series name (with similarity hint when a related game is detected), last played date, notes, and a removable play history list.
 - **Suggestions** (`/suggest`) — criteria form with player count, time range, complexity range, favorites-only toggle, unplayed-only toggle, max play count, min rating, series, categories, and mechanics. Five preset buttons (Quick game, Game night, Party, New to me, Top picks) stamp sensible defaults in one click. Category/mechanic chips are dynamically filtered to only show options present in games matching the current hard criteria — stale selections are visually distinguished. Results show a score badge, notes blurb (when present), and category/mechanic chips so unfamiliar players can understand each game at a glance. Scoring combines a variety bonus (months since last played, capped at 6) and personal rating. Paginated with "Show more."
 - **Dictionary** (`/dictionary`) — searchable reference of all preset categories and mechanics with descriptions, so you know which tags apply to a game.
-- **BGG lookup** — an "Import from BoardGameGeek" search box on the Add Game form (`/api/bgg/search`, `/api/bgg/{bggId}`) lets you search by name, pick a result, and auto-fill title/players/time/complexity/categories/mechanics/thumbnail. Cached to absorb BGG's aggressive rate limits; requires a `BGG_API_TOKEN` (see above) or it degrades to "No matches" instead of erroring.
+- **BGG lookup** — an "Import from BoardGameGeek" search box on the Add Game form (`/api/bgg/search`, `/api/bgg/{bggId}`) lets you search by name, pick a result, and auto-fill title/players/time/complexity/categories/mechanics/thumbnail, plus BGG's description into Notes (only if you haven't typed your own). Cached to absorb BGG's aggressive rate limits; requires a `BGG_API_TOKEN` (see above) or it degrades to "No matches" instead of erroring.
 - **Dark / light mode** — theme toggle persisted to `localStorage`, defaults to `prefers-color-scheme`.
 
 ## API surface

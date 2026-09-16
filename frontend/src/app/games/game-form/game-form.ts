@@ -66,6 +66,20 @@ function snapComplexity(n: number | null): number | null {
   return Math.min(5, Math.max(1, Math.round(n)));
 }
 
+// BGG's description text is XML-escaped and often contains a literal <br/> for line
+// breaks alongside standard HTML entities (e.g. "&amp;rsquo;" for a right single quote).
+// Converting <br/> to a real newline first (before entity-decoding) preserves it —
+// otherwise setting it as textarea.innerHTML would just silently drop the tag. Using
+// the browser's own entity decoder (rather than a hand-rolled regex table) handles
+// every entity BGG might send, including numeric ones, correctly and safely — the
+// result is only ever read back out as a plain string, never re-inserted as HTML.
+function decodeBggDescription(raw: string): string {
+  const withBreaks = raw.replace(/<br\s*\/?>/gi, '\n');
+  const el = document.createElement('textarea');
+  el.innerHTML = withBreaks;
+  return el.value.replace(/<[^>]+>/g, '').trim();
+}
+
 @Component({
   selector: 'app-game-form',
   imports: [FormsModule],
@@ -400,6 +414,9 @@ export class GameForm implements OnInit {
           categories: details.categories.length > 0 ? details.categories : d.categories,
           mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
           thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
+          // Only prefill notes if you haven't already typed your own — never clobber
+          // personal notes, same rule the rest of the import follows for rating/favorite/etc.
+          notes: !d.notes?.trim() && details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);
         this.bggResults.set([]);

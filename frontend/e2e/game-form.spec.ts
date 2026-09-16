@@ -182,11 +182,66 @@ test.describe('Add / edit game form', () => {
     await expect(page.getByRole('alert')).toHaveText('Game not found: 999999999');
   });
 
-  test('BGG import search degrades to "no matches" gracefully (no token configured in this dev environment)', async ({ page }) => {
+  test('BGG search shows "no matches" for a query nothing could match', async ({ page }) => {
+    // A random gibberish string is guaranteed empty regardless of whether a real
+    // BGG_API_TOKEN is configured — unlike searching a real game name, this doesn't
+    // depend on this environment's token status to mean the same thing either way.
+    await page.goto('/games/add');
+    const gibberish = `zzznomatch${Math.random().toString(36).slice(2, 10)}`;
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill(gibberish);
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await expect(page.getByText('No matches on BoardGameGeek.')).toBeVisible();
+  });
+
+  test('BGG import fills in title, players, time, complexity, categories, mechanics, and notes from a real result', async ({ page, request }) => {
+    // Only meaningful with a real BGG_API_TOKEN configured (see backend/.env) — without
+    // one, every search returns empty and there's no result to import. Skip rather than
+    // assert either behavior is "the" correct one for an environment that hasn't set it up.
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
     await page.goto('/games/add');
     await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
-    await expect(page.getByText('No matches on BoardGameGeek.')).toBeVisible();
+    // Matches "Catan" (1995) itself, not a variant/expansion whose name merely starts with it.
+    const option = page.getByRole('option', { name: /^Catan\s/ }).first();
+    await expect(option).toBeVisible();
+    await option.click();
+
+    await expect(page.locator('.bgg-import__confirm')).toContainText('Catan');
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Catan');
+    await expect(page.locator('.field', { hasText: 'Players' })).toContainText('3–4');
+    await expect(page.locator('.field', { hasText: 'Play time' })).toContainText('1h');
+    await expect(page.locator('.field', { hasText: 'Complexity' })).not.toContainText('optional');
+    // "Negotiation" exists as both a category and a mechanic for Catan — scope to one.
+    await expect(
+      page.locator('.field', { hasText: 'Categories' }).getByRole('button', { name: 'Negotiation', exact: true })
+    ).toHaveClass(/selected/);
+
+    // The long-form BGG description should have prefilled Notes (see decodeBggDescription) —
+    // real text, not raw HTML entities/tags left undecoded.
+    const notes = await page.locator('textarea[name="notes"]').inputValue();
+    expect(notes.toLowerCase()).toContain('catan');
+    expect(notes).not.toMatch(/&[a-z#0-9]+;/i);
+    expect(notes).not.toMatch(/<[a-z][^>]*>/i);
+  });
+
+  test('BGG import never overwrites notes you already typed yourself', async ({ page, request }) => {
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+    const myNotes = 'My own pre-existing note.';
+    await page.locator('textarea[name="notes"]').fill(myNotes);
+
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan\s/ }).first().click();
+    await expect(page.locator('.bgg-import__confirm')).toBeVisible();
+
+    await expect(page.locator('textarea[name="notes"]')).toHaveValue(myNotes);
   });
 
   test('edit mode lets you mark a play removed and restore it before saving', async ({ page, request }) => {

@@ -66,14 +66,31 @@ test.describe('Backend API', () => {
     expect(response.status()).toBe(400);
   });
 
-  test('BGG search and lookup degrade gracefully without a configured token', async ({ request }) => {
-    // This dev environment has no BGG_API_TOKEN set — see BggClient's javadoc. Both endpoints
-    // should degrade to "no data" rather than surface BGG's underlying 401 as a 500.
-    const search = await request.get('/api/bgg/search', { params: { q: 'catan' } });
+  test('BGG search always returns 200 with an array, even for a query nothing matches', async ({ request }) => {
+    // True regardless of whether BGG_API_TOKEN is configured — a nonsense query returns
+    // no results either way, so this doesn't need to branch on this environment's setup.
+    const gibberish = `zzznomatch${Math.random().toString(36).slice(2, 10)}`;
+    const search = await request.get('/api/bgg/search', { params: { q: gibberish } });
     expect(search.status()).toBe(200);
     expect(await search.json()).toEqual([]);
+  });
 
-    const details = await request.get('/api/bgg/13');
-    expect(details.status()).toBe(404);
+  test('BGG lookup for a real id reflects whether a token is configured', async ({ request }) => {
+    // Detect this environment's token status from a real search rather than hard-coding
+    // an assumption either way — see backend/.env for how BGG_API_TOKEN is set locally.
+    const probe = await request.get('/api/bgg/search', { params: { q: 'catan' } });
+    const hits = await probe.json();
+    const details = await request.get('/api/bgg/13'); // 13 is BGG's real id for Catan.
+
+    if (hits.length === 0) {
+      // No token — BggClient catches BGG's 401 and degrades to "not found" rather than 500.
+      expect(details.status()).toBe(404);
+    } else {
+      // A real token is configured — this should be real BGG data for the actual game.
+      expect(details.status()).toBe(200);
+      const body = await details.json();
+      expect(body.title).toBe('Catan');
+      expect(body.categories.length).toBeGreaterThan(0);
+    }
   });
 });
