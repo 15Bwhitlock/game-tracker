@@ -109,6 +109,11 @@ export class GameForm implements OnInit {
   readonly ownedBggIds = computed(() =>
     new Set(this.allGames().map(g => g.bggId).filter((id): id is number => id != null))
   );
+  // Snapshot of the draft right before a BGG import is applied, so Undo can restore it
+  // exactly — including Notes, which an import always overwrites (see importBggGame),
+  // even text you typed yourself. Undo is the safety net for that: if a lookup replaced
+  // something you wanted to keep, this puts every field back exactly as it was.
+  private preImportSnapshot: Game | null = null;
 
   readonly editId = signal<number | null>(null);
   readonly loading = signal(false);
@@ -409,6 +414,11 @@ export class GameForm implements OnInit {
     this.bggError.set(null);
     this.bggApi.details(hit.bggId).subscribe({
       next: (details) => {
+        // Undo needs to restore exactly what was here before — including Notes, which
+        // this always overwrites below (per explicit request: a lookup should always
+        // replace Notes with the new game's description, even over text you typed
+        // yourself). Snapshotting first is what makes that safe to do unconditionally.
+        this.preImportSnapshot = this.draft();
         this.draft.update(d => ({
           ...d,
           bggId: details.bggId,
@@ -421,9 +431,7 @@ export class GameForm implements OnInit {
           categories: details.categories.length > 0 ? details.categories : d.categories,
           mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
           thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
-          // Only prefill notes if you haven't already typed your own — never clobber
-          // personal notes, same rule the rest of the import follows for rating/favorite/etc.
-          notes: !d.notes?.trim() && details.description ? decodeBggDescription(details.description) : d.notes,
+          notes: details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);
         this.bggDuplicateGame.set(this.allGames().find(g => g.bggId === hit.bggId) ?? null);
@@ -440,9 +448,12 @@ export class GameForm implements OnInit {
   }
 
   clearBggImport(): void {
+    if (this.preImportSnapshot) {
+      this.draft.set(this.preImportSnapshot);
+      this.preImportSnapshot = null;
+    }
     this.bggImportedHit.set(null);
     this.bggDuplicateGame.set(null);
-    this.draft.update(d => ({ ...d, bggId: null }));
   }
 
   dismissBggDuplicateWarning(): void {

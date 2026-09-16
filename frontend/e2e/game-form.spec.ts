@@ -259,13 +259,13 @@ test.describe('Add / edit game form', () => {
     expect(notes).not.toMatch(/<[a-z][^>]*>/i);
   });
 
-  test('BGG import never overwrites notes you already typed yourself', async ({ page, request }) => {
+  test('BGG import always overwrites notes with the looked-up game\'s description, even ones typed beforehand', async ({ page, request }) => {
     const probe = await request.get('/api/bgg/search?q=catan');
     const hits = await probe.json();
     test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
 
     await page.goto('/games/add');
-    const myNotes = 'My own pre-existing note.';
+    const myNotes = 'My own pre-existing note, written before any lookup.';
     await page.locator('textarea[name="notes"]').fill(myNotes);
 
     await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
@@ -273,7 +273,89 @@ test.describe('Add / edit game form', () => {
     await page.getByRole('option', { name: /^Catan\s/ }).first().click();
     await expect(page.locator('.bgg-import__confirm')).toBeVisible();
 
+    const notes = await page.locator('textarea[name="notes"]').inputValue();
+    expect(notes).not.toBe(myNotes);
+    expect(notes.toLowerCase()).toContain('catan');
+  });
+
+  test('Undo after a BGG import restores every field to exactly what it was before the lookup', async ({ page, request }) => {
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+    const myTitle = 'My Manually Typed Title';
+    const myNotes = 'Notes I wrote before looking anything up.';
+    await page.getByPlaceholder('Game Title').fill(myTitle);
+    await page.locator('textarea[name="notes"]').fill(myNotes);
+    await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '5', exact: true }).click();
+
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan\s/ }).first().click();
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Catan');
+
+    await page.getByRole('button', { name: 'Undo' }).click();
+
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue(myTitle);
     await expect(page.locator('textarea[name="notes"]')).toHaveValue(myNotes);
+    await expect(
+      page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '5', exact: true })
+    ).toHaveClass(/selected/);
+    await expect(page.locator('.bgg-import__confirm')).not.toBeVisible();
+  });
+
+  test('importing a second, different game before saving updates notes to the new game, not the old one', async ({ page, request }) => {
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+
+    // First import: Catan.
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan\s/ }).first().click();
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Catan');
+    const catanNotes = await page.locator('textarea[name="notes"]').inputValue();
+    expect(catanNotes.toLowerCase()).toContain('catan');
+
+    // Second import, without saving in between: a different game entirely. Every
+    // field — including Notes — should reflect Fluxx now, not leftover Catan text.
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('fluxx');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Fluxx\s/ }).first().click();
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Fluxx');
+
+    const fluxxNotes = await page.locator('textarea[name="notes"]').inputValue();
+    expect(fluxxNotes).not.toBe(catanNotes);
+    expect(fluxxNotes.toLowerCase()).not.toContain('catan');
+    expect(fluxxNotes.toLowerCase()).toContain('fluxx');
+  });
+
+  test('notes typed between two imports are still overwritten by the second, same as any other lookup', async ({ page, request }) => {
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan\s/ }).first().click();
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Catan');
+
+    const myNotes = 'My own notes typed after the first import.';
+    await page.locator('textarea[name="notes"]').fill(myNotes);
+
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('fluxx');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Fluxx\s/ }).first().click();
+    await expect(page.getByPlaceholder('Game Title')).toHaveValue('Fluxx');
+
+    const notes = await page.locator('textarea[name="notes"]').inputValue();
+    expect(notes).not.toBe(myNotes);
+    expect(notes.toLowerCase()).toContain('fluxx');
   });
 
   test('edit mode lets you mark a play removed and restore it before saving', async ({ page, request }) => {
