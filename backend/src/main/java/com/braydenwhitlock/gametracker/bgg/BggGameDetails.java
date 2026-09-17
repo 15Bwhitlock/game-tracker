@@ -18,6 +18,8 @@ import java.util.List;
  * @param complexityWeight    BGG's "weight" rating (1.0–5.0); null if unrated
  * @param categories          BGG board game category names (e.g. "Strategy")
  * @param mechanics           BGG mechanic names (e.g. "Deck Building")
+ * @param bestPlayerCounts    player counts the BGG community's poll marks as "Best"
+ *                            (e.g. [4] or [3, 4]); empty if BGG has no such poll data yet
  */
 public record BggGameDetails(
         int bggId,
@@ -32,4 +34,5 @@ public record BggGameDetails(
         Integer maxPlayTimeMinutes,
         Double complexityWeight,
         List<String> categories,
-        List<String> mechanics) {}
+        List<String> mechanics,
+        List<Integer> bestPlayerCounts) {}

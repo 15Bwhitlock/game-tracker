@@ -20,4 +20,5 @@ export interface BggGameDetails {
   complexityWeight: number | null;
   categories: string[];
   mechanics: string[];
+  bestPlayerCounts: number[];
 }

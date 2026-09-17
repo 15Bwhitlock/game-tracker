@@ -262,6 +262,9 @@
                     · rated {{ sg.game.personalRating }}/10
                   }
                 </div>
+                @if (sg.reasons.length) {
+                  <div class="suggestion__reasons muted">{{ sg.reasons.join(' · ') }}</div>
+                }
                 @if (sg.game.notes) {
                   <p class="suggestion__notes">{{ sg.game.notes }}</p>
                 }

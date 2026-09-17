@@ -98,6 +98,14 @@ public class Game {
     @Column(name = "year_published")
     private Integer yearPublished;
 
+    // Player counts BGG's "suggested_numplayers" poll marks as "Best" (e.g. [4] or [3, 4]).
+    // Empty for manually-added games or games BGG has no poll data for yet.
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "game_best_player_counts", joinColumns = @JoinColumn(name = "game_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "player_count", nullable = false)
+    private List<Integer> bestPlayerCounts = new ArrayList<>();
+
     @Column(name = "owned_since")
     private LocalDate ownedSince;
 
@@ -162,6 +170,9 @@ public class Game {
 
     public Integer getYearPublished() { return yearPublished; }
     public void setYearPublished(Integer yearPublished) { this.yearPublished = yearPublished; }
+
+    public List<Integer> getBestPlayerCounts() { return bestPlayerCounts; }
+    public void setBestPlayerCounts(List<Integer> bestPlayerCounts) { this.bestPlayerCounts = bestPlayerCounts != null ? bestPlayerCounts : new ArrayList<>(); }
 
     public LocalDate getOwnedSince() { return ownedSince; }
     public void setOwnedSince(LocalDate ownedSince) { this.ownedSince = ownedSince; }

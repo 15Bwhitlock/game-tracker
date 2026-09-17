@@ -19,6 +19,18 @@
         <link type="boardgamemechanic" id="2040" value="Dice Rolling"/>
         <link type="boardgamemechanic" id="2008" value="Trading"/>
         <link type="boardgamefamily" id="62" value="Components: Hexagonal Tiles"/>
+        <poll name="suggested_numplayers" title="User Suggested Number of Players" totalvotes="500">
+            <results numplayers="3">
+                <result value="Best" numvotes="200"/>
+            </results>
+            <results numplayers="4">
+                <result value="Best" numvotes="180"/>
+            </results>
+        </poll>
+        <poll-summary name="suggested_numplayers" title="User Suggested Number of Players">
+            <result name="bestwith" value="Best with 3–4 players"/>
+            <result name="recommmendedwith" value="Recommended with 2–4 players"/>
+        </poll-summary>
         <statistics page="1">
             <ratings>
                 <usersrated value="111111"/>

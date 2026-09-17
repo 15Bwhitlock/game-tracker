@@ -46,6 +46,7 @@ export interface SeedGameOptions {
   complexityWeight?: number | null;
   categories?: string[];
   mechanics?: string[];
+  bestPlayerCounts?: number[];
   personalRating?: number | null;
   notes?: string | null;
   favorite?: boolean;
@@ -68,6 +69,7 @@ export async function seedGame(request: APIRequestContext, options: SeedGameOpti
       complexityWeight: options.complexityWeight ?? null,
       categories: options.categories ?? [],
       mechanics: options.mechanics ?? [],
+      bestPlayerCounts: options.bestPlayerCounts ?? [],
       personalRating: options.personalRating ?? null,
       notes: options.notes ?? null,
       favorite: options.favorite ?? false,

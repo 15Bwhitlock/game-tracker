@@ -23,8 +23,7 @@ import java.util.Set;
  * the survivors so the top-N feel intentional rather than alphabetical.
  *
  * <p>Scoring weights are picked to be small and additive — easy to reason about, easy to
- * tweak. Best-player-count fit will be added once a {@code bestPlayerCount} field lands on
- * {@code Game} (sourced from BGG's poll data).
+ * tweak.
  */
 @Service
 @Transactional(readOnly = true)
@@ -41,6 +40,9 @@ public class SuggestionService {
 
     /** Rating: personalRating / 2 → range [0.5, 5.0]. Null rating contributes 0. */
     static final double RATING_DIVISOR = 2.0;
+
+    /** Bonus when BGG's "best with" poll agrees with the requested player count. */
+    static final double BEST_PLAYER_COUNT_BONUS = 1.5;
 
     // BGG weight ranges for each integer complexity level (1–5).
     private static final double[] COMPLEXITY_LOWER = { 0, 1.0, 1.7, 2.5, 3.3, 4.0 };
@@ -65,7 +67,7 @@ public class SuggestionService {
 
         List<ScoredGame> all = gameRepository.findAll().stream()
                 .filter(game -> passesHardFilters(game, criteria))
-                .map(game -> score(game, today))
+                .map(game -> score(game, today, criteria))
                 .sorted(byScoreThenRatingThenTitle())
                 .toList();
 
@@ -121,7 +123,7 @@ public class SuggestionService {
         return true;
     }
 
-    private static ScoredGame score(Game game, LocalDate today) {
+    private static ScoredGame score(Game game, LocalDate today, SuggestionCriteria criteria) {
         double score = 0.0;
         List<String> reasons = new ArrayList<>();
 
@@ -139,7 +141,38 @@ public class SuggestionService {
             }
         }
 
+        if (matchesRequestedPlayerCount(game, criteria)) {
+            score += BEST_PLAYER_COUNT_BONUS;
+            reasons.add("Best with " + describeBestPlayerCounts(game.getBestPlayerCounts()) + " players");
+        }
+
         return new ScoredGame(game, score, reasons);
+    }
+
+    /** True when at least one of the game's BGG-best player counts falls in the requested range. */
+    private static boolean matchesRequestedPlayerCount(Game game, SuggestionCriteria criteria) {
+        List<Integer> bestCounts = game.getBestPlayerCounts();
+        if (bestCounts == null || bestCounts.isEmpty()) {
+            return false;
+        }
+        int reqMin = criteria.minPlayers();
+        int reqMax = criteria.maxPlayers() != null ? criteria.maxPlayers() : reqMin;
+        for (Integer count : bestCounts) {
+            if (count != null && count >= reqMin && count <= reqMax) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String describeBestPlayerCounts(List<Integer> counts) {
+        List<Integer> sorted = counts.stream().sorted().toList();
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < sorted.size(); i++) {
+            if (i > 0) sb.append(i == sorted.size() - 1 ? " or " : ", ");
+            sb.append(sorted.get(i));
+        }
+        return sb.toString();
     }
 
     private static double varietyBonus(LocalDate lastPlayed, LocalDate today) {

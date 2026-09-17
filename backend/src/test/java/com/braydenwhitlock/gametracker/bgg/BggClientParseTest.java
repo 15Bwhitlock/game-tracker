@@ -61,6 +61,21 @@ class BggClientParseTest {
         assertThat(details.thumbnailUrl()).contains("thumb");
         assertThat(details.imageUrl()).contains("large");
         assertThat(details.description()).contains("Trade, build, and settle");
+        assertThat(details.bestPlayerCounts()).containsExactly(3, 4);
+    }
+
+    @Test
+    void expandsBestPlayerCountRangesFromThePollSummary() {
+        assertThat(BggClient.expandPlayerCountRanges("Best with 4 players")).containsExactly(4);
+        assertThat(BggClient.expandPlayerCountRanges("Best with 2–4 players")).containsExactly(2, 3, 4);
+        assertThat(BggClient.expandPlayerCountRanges("Best with 2-4 players")).containsExactly(2, 3, 4);
+        assertThat(BggClient.expandPlayerCountRanges("Best with 1–2, 4 players")).containsExactly(1, 2, 4);
+    }
+
+    @Test
+    void thingWithNoPollSummaryHasEmptyBestPlayerCounts() throws IOException {
+        BggGameDetails details = BggClient.parseThingXml(load("bgg/thing-unrated.xml")).orElseThrow();
+        assertThat(details.bestPlayerCounts()).isEmpty();
     }
 
     @Test

@@ -438,6 +438,7 @@ export class GameForm implements OnInit {
           thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
           imageUrl: details.imageUrl ?? d.imageUrl,
           yearPublished: details.yearPublished ?? d.yearPublished,
+          bestPlayerCounts: details.bestPlayerCounts.length > 0 ? details.bestPlayerCounts : d.bestPlayerCounts,
           notes: details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);
