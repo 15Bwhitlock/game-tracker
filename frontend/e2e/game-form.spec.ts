@@ -436,8 +436,8 @@ test.describe('Add / edit game form', () => {
 
     await expect(page).toHaveURL(/\/collection/);
     const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
-    // td order: Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
-    await expect(row.locator('td').nth(6)).toHaveText('9');
+    // td order: Select, Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
+    await expect(row.locator('td').nth(7)).toHaveText('9');
 
     await deleteGame(request, id);
   });

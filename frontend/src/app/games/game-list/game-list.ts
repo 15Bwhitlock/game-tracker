@@ -1,6 +1,7 @@
 import { Component, ElementRef, HostListener, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, RouterLink } from '@angular/router';
+import { forkJoin } from 'rxjs';
 
 import { GameApi, GamePlay } from '@shared/api';
 import { Game, PLAYERS_UNLIMITED, TIME_UNLIMITED } from '@shared/models';
@@ -19,9 +20,22 @@ export class GameList implements OnInit {
 
   readonly deleteDialog = viewChild<ElementRef<HTMLDialogElement>>('deleteDialog');
   readonly detailDialog = viewChild<ElementRef<HTMLDialogElement>>('detailDialog');
+  readonly bulkDeleteDialog = viewChild<ElementRef<HTMLDialogElement>>('bulkDeleteDialog');
 
   readonly gameToDelete = signal<Game | null>(null);
   readonly selectedGame = signal<Game | null>(null);
+
+  // Multi-select for bulk actions — a plain set of ids rather than tracking selection on
+  // each Game object, since selection is transient UI state, not part of the game itself.
+  readonly selectedIds = signal<Set<number>>(new Set());
+  readonly selectedCount = computed(() => this.selectedIds().size);
+  readonly allVisibleSelected = computed(() => {
+    const visible = this.filteredGames();
+    return visible.length > 0 && visible.every(g => g.id != null && this.selectedIds().has(g.id));
+  });
+  readonly bulkTagInput = signal('');
+  readonly bulkTagType = signal<'category' | 'mechanic'>('category');
+  readonly bulkActionError = signal<string | null>(null);
 
   readonly games = signal<Game[]>([]);
   readonly loading = signal(false);
@@ -252,11 +266,101 @@ export class GameList implements OnInit {
     this.api.delete(game.id).subscribe({
       next: () => {
         this.games.update((list) => list.filter((g) => g.id !== game.id));
+        this.selectedIds.update(ids => { const next = new Set(ids); next.delete(game.id!); return next; });
         this.gameToDelete.set(null);
       },
       error: (err) => {
         this.error.set(describeHttpError(err));
         this.gameToDelete.set(null);
+      }
+    });
+  }
+
+  toggleSelect(game: Game): void {
+    if (game.id == null) return;
+    const id = game.id;
+    this.selectedIds.update(ids => {
+      const next = new Set(ids);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  toggleSelectAllVisible(): void {
+    const visible = this.filteredGames();
+    const shouldSelect = !this.allVisibleSelected();
+    this.selectedIds.update(ids => {
+      const next = new Set(ids);
+      for (const g of visible) {
+        if (g.id == null) continue;
+        if (shouldSelect) next.add(g.id); else next.delete(g.id);
+      }
+      return next;
+    });
+  }
+
+  clearSelection(): void {
+    this.selectedIds.set(new Set());
+    this.bulkTagInput.set('');
+    this.bulkActionError.set(null);
+  }
+
+  // Adds one tag (category or mechanic) to every selected game, skipping games that
+  // already have it. A full PUT via the existing update() endpoint — no bulk-specific
+  // backend endpoint needed since the selection is small and this only runs on demand.
+  applyBulkTag(): void {
+    const tag = this.bulkTagInput().trim();
+    if (!tag) return;
+    const type = this.bulkTagType();
+    const ids = this.selectedIds();
+    const targets = this.games().filter(g => g.id != null && ids.has(g.id));
+    const updates = targets
+      .filter(g => !(type === 'category' ? g.categories : g.mechanics).includes(tag))
+      .map(g => this.api.update(g.id!, {
+        ...g,
+        categories: type === 'category' ? [...g.categories, tag] : g.categories,
+        mechanics: type === 'mechanic' ? [...g.mechanics, tag] : g.mechanics,
+      }));
+
+    if (updates.length === 0) {
+      this.bulkTagInput.set('');
+      return;
+    }
+
+    this.bulkActionError.set(null);
+    forkJoin(updates).subscribe({
+      next: (saved) => {
+        this.games.update(list => list.map(g => saved.find(s => s.id === g.id) ?? g));
+        this.bulkTagInput.set('');
+      },
+      error: (err) => this.bulkActionError.set(describeHttpError(err))
+    });
+  }
+
+  confirmBulkDelete(): void {
+    this.bulkDeleteDialog()?.nativeElement.showModal();
+  }
+
+  cancelBulkDelete(): void {
+    this.bulkDeleteDialog()?.nativeElement.close();
+  }
+
+  executeBulkDelete(): void {
+    const ids = [...this.selectedIds()];
+    if (ids.length === 0) return;
+    this.bulkDeleteDialog()?.nativeElement.close();
+    this.bulkActionError.set(null);
+    forkJoin(ids.map(id => this.api.delete(id))).subscribe({
+      next: () => {
+        this.games.update(list => list.filter(g => g.id == null || !ids.includes(g.id)));
+        this.selectedIds.set(new Set());
+      },
+      error: (err) => {
+        this.bulkActionError.set(describeHttpError(err));
+        // Some deletes may have already succeeded before the failure — resync with the
+        // server rather than leaving stale rows or a stale selection in the UI.
+        this.selectedIds.set(new Set());
+        this.refresh();
       }
     });
   }
