@@ -474,6 +474,15 @@ test.describe('Add / edit game form', () => {
   });
 
   test('refresh-from-BGG button re-fetches and re-applies BGG data on an already-linked game', async ({ page, request }) => {
+    // Only meaningful with a real BGG_API_TOKEN configured — without one, the refresh
+    // call returns nothing and there's nothing to assert. Checking (and skipping) before
+    // seedGame also avoids seeding bggId 13 (Catan) in an environment with no token,
+    // which would collide with V3's seed data on a database that still has that
+    // unmodified seed row (e.g. this suite's own CI run, or anyone's fresh first clone).
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
     const title = e2eTitle('refresh flow');
     // bggId 13 is Catan (used throughout this suite's other real-BGG-lookup tests).
     // Seed with obviously-stale metadata a refresh should overwrite.
@@ -502,6 +511,12 @@ test.describe('Add / edit game form', () => {
   });
 
   test('Undo after a refresh-from-BGG restores the game to exactly what it was before', async ({ page, request }) => {
+    // Same reasoning as the test above: skip (before seeding bggId 13) when no real
+    // BGG_API_TOKEN is configured.
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
     const title = e2eTitle('refresh undo flow');
     const id = await seedGame(request, {
       title, bggId: 13, minPlayers: 2, maxPlayers: 2, minPlayTimeMinutes: 15, maxPlayTimeMinutes: 15,
