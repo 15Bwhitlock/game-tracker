@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend-tests:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      # mvn test only reaches Maven's `test` phase — the frontend-maven-plugin (which
+      # builds the Angular app) is bound to `prepare-package`, later in the lifecycle,
+      # so this never touches the frontend. GameRepositoryTest uses Testcontainers,
+      # which spins up its own throwaway Postgres via Docker (preinstalled on the
+      # runner) — no external database service needed for this job.
+      - name: Run backend tests
+        working-directory: backend
+        run: ./mvnw --batch-mode test
+
+  e2e-tests:
+    name: End-to-end tests
+    runs-on: ubuntu-latest
+    needs: backend-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: gametracker
+          POSTGRES_USER: gametracker
+          POSTGRES_PASSWORD: gametracker
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gametracker -d gametracker"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.19'
+
+      # spring-boot:run (not the packaged jar) is deliberate — it's the same command
+      # PLAN.md's "Getting started" walks a human through, and it skips the
+      # frontend-maven-plugin build entirely (see its comment in pom.xml), so this step
+      # never needs npm. No BGG_API_TOKEN is configured here on purpose: BggClient
+      # degrades to empty results without one (see its class Javadoc), and every e2e
+      # test that depends on a real BGG lookup already self-skips when that happens
+      # (test.skip(hits.length === 0, ...)) — this workflow deliberately doesn't touch
+      # the real BGG API rather than requiring a token secret to go green.
+      - name: Start backend
+        working-directory: backend
+        run: |
+          nohup ./mvnw --batch-mode --quiet spring-boot:run > ../backend.log 2>&1 &
+          echo "Waiting for backend to come up on :8080..."
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/api/games > /dev/null; then
+              echo "Backend is up."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Backend did not come up in time; last 200 lines of its log:"
+          tail -n 200 ../backend.log
+          exit 1
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # Playwright's own config (playwright.config.ts) starts the Angular dev server
+      # itself via its `webServer` option once CI=true, and the dev server's proxy
+      # forwards /api/* to the backend already running above — see that file's header
+      # comment for the full picture. workers: 1 is required (see the same file):
+      # every test shares this one real Postgres database, no isolated test DB.
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        working-directory: frontend
+        env:
+          CI: 'true'
+        run: npx playwright test
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: frontend/playwright-report/
+          retention-days: 7

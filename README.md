@@ -1,5 +1,7 @@
 # Game Tracker
 
+[![CI](https://github.com/15Bwhitlock/game-tracker/actions/workflows/ci.yml/badge.svg)](https://github.com/15Bwhitlock/game-tracker/actions/workflows/ci.yml)
+
 A personal web app to catalog board games and recommend what to play with friends based on player count, available time, and other criteria.
 
 ## Stack
@@ -141,7 +143,9 @@ cd frontend && npm run test:e2e        # headless
 cd frontend && npm run test:e2e:ui     # Playwright's interactive UI mode
 ```
 
-54 tests covering the collection, add/edit form, suggestions, dictionary, and app shell (theme/nav/404) pages end-to-end against the real dev backend — including suggestion scoring/ranking order, the series filter, and simulated HTTP-failure error banners — plus direct API checks for endpoints with no UI path. See [PLAN.md](PLAN.md)'s Testing strategy section for how it isolates itself from your actual collection data and why `workers: 1` is required.
+Tests cover the collection, add/edit form, suggestions, dictionary, and app shell (theme/nav/404) pages end-to-end against the real dev backend — including suggestion scoring/ranking order, the series filter, and simulated HTTP-failure error banners — plus direct API checks for endpoints with no UI path. See [PLAN.md](PLAN.md)'s Testing strategy section for how it isolates itself from your actual collection data and why `workers: 1` is required.
+
+Both suites run automatically in CI (`.github/workflows/ci.yml`) on every push/PR to `main` — see PLAN.md's CI section for how the e2e job stands up a throwaway Postgres and backend without needing a `BGG_API_TOKEN` secret.
 
 ## Status
 
