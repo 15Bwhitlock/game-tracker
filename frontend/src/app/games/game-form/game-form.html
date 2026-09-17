@@ -68,6 +68,9 @@
               ({{ bggImportedHit()?.yearPublished }})
             }
             — fields below were filled in for you.
+            @if (bggMissingPersonalFields().length > 0) {
+              BGG doesn't know {{ bggMissingPersonalFields().join(' or ') }} — that's still up to you.
+            }
             <button type="button" class="btn btn--ghost btn--sm" (click)="clearBggImport()">Undo</button>
           </p>
         }

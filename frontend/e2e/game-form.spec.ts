@@ -270,6 +270,27 @@ test.describe('Add / edit game form', () => {
     await deleteGame(request, saved.id);
   });
 
+  test('BGG import confirmation nudges you toward a personal rating, but not once you\'ve already set one', async ({ page, request }) => {
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan\s/ }).first().click();
+
+    const confirm = page.locator('.bgg-import__confirm');
+    await expect(confirm).toContainText("BGG doesn't know a personal rating");
+
+    // Once you've set a rating, importing something else shouldn't nag about it again.
+    await page.getByRole('group', { name: 'Personal rating' }).getByRole('button', { name: '9', exact: true }).click();
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('fluxx');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Fluxx\s/ }).first().click();
+    await expect(confirm).not.toContainText("BGG doesn't know");
+  });
+
   test('BGG import always overwrites notes with the looked-up game\'s description, even ones typed beforehand', async ({ page, request }) => {
     const probe = await request.get('/api/bgg/search?q=catan');
     const hits = await probe.json();
@@ -403,6 +424,10 @@ test.describe('Add / edit game form', () => {
     const title = e2eTitle('edit flow');
     const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2 });
 
+    // This asserts against table-specific markup once redirected back to /collection —
+    // force list view regardless of the grid default (see game-list.spec's own describe
+    // block for what actually tests grid view and the default itself).
+    await page.addInitScript(() => localStorage.setItem('collectionViewMode', 'list'));
     await page.goto(`/games/${id}/edit`);
     await expect(page.getByPlaceholder('Game Title')).toHaveValue(title);
 

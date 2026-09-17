@@ -5,7 +5,11 @@ test.describe('Collection page', () => {
   let gameId: number;
   let title: string;
 
-  test.beforeEach(async ({ request }) => {
+  test.beforeEach(async ({ page, request }) => {
+    // These tests assert against table-specific markup (.plays-cell, <tr> rows, etc.),
+    // so force list view regardless of the grid default — the view-toggle describe
+    // block below is what actually tests grid view and the default itself.
+    await page.addInitScript(() => localStorage.setItem('collectionViewMode', 'list'));
     title = e2eTitle('Collection Game');
     gameId = await seedGame(request, {
       title,
@@ -184,6 +188,11 @@ test.describe('Collection page', () => {
 });
 
 test.describe('Collection page BGG metadata display', () => {
+  test.beforeEach(async ({ page }) => {
+    // The row-thumbnail assertion below is list-view-specific markup.
+    await page.addInitScript(() => localStorage.setItem('collectionViewMode', 'list'));
+  });
+
   test('shows a thumbnail and year in the row, and the full image and year in the detail modal', async ({ page, request }) => {
     const title = e2eTitle('Illustrated Game');
     const id = await seedGame(request, {
@@ -229,6 +238,11 @@ test.describe('Collection page BGG metadata display', () => {
 
 test.describe('Collection page sorting', () => {
   const ids: number[] = [];
+
+  test.beforeEach(async ({ page }) => {
+    // These tests compare <tr> DOM order, which only exists in list view.
+    await page.addInitScript(() => localStorage.setItem('collectionViewMode', 'list'));
+  });
 
   test.afterEach(async ({ request }) => {
     await Promise.all(ids.splice(0).map((id) => deleteGame(request, id)));
@@ -300,5 +314,107 @@ test.describe('Collection page error handling', () => {
 
     await page.goto('/collection');
     await expect(page.getByRole('alert')).toHaveText('Simulated collection load failure');
+  });
+});
+
+test.describe('Collection page view toggle', () => {
+  test('switches between list and grid view, and remembers the choice across reloads', async ({ page, request }) => {
+    const title = e2eTitle('View Toggle Game');
+    const id = await seedGame(request, {
+      title,
+      thumbnailUrl: 'https://cf.geekdo-images.com/example/thumb.jpg',
+      imageUrl: 'https://cf.geekdo-images.com/example/full.jpg'
+    });
+
+    try {
+      await page.goto('/collection');
+      // Defaults to grid view.
+      await expect(page.locator('.game-grid')).toBeVisible();
+      await expect(page.locator('table.table')).not.toBeVisible();
+
+      await page.locator('.view-toggle__btn[title="List view"]').click();
+      await expect(page.locator('table.table')).toBeVisible();
+      await expect(page.locator('.game-grid')).not.toBeVisible();
+
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      await expect(page.locator('.game-grid')).toBeVisible();
+      await expect(page.locator('table.table')).not.toBeVisible();
+
+      const tile = page.locator('.grid-tile', { has: page.getByRole('button', { name: title }) });
+      await expect(tile.locator('.grid-tile__cover img')).toHaveAttribute('src', 'https://cf.geekdo-images.com/example/full.jpg');
+
+      // Reloading should remember the grid choice (persisted to localStorage).
+      await page.reload();
+      await expect(page.locator('.game-grid')).toBeVisible();
+
+      // Clicking a tile's title still opens the same detail modal as list view.
+      await tile.getByRole('button', { name: title }).click();
+      await expect(page.locator('dialog.modal--detail')).toBeVisible();
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+
+  test('grid view shows a placeholder for games with no image', async ({ page, request }) => {
+    const title = e2eTitle('No Image Game');
+    const id = await seedGame(request, { title });
+
+    try {
+      await page.goto('/collection');
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      const tile = page.locator('.grid-tile', { has: page.getByRole('button', { name: title }) });
+      await expect(tile.locator('.grid-tile__placeholder')).toBeVisible();
+      await expect(tile.locator('.grid-tile__cover img')).toHaveCount(0);
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+});
+
+test.describe('Collection page BGG filter', () => {
+  test('filters to BGG-linked or unlinked games, updates the count, and still combines with sort', async ({ page, request }) => {
+    const linkedTitle = e2eTitle('Filter Linked Game');
+    const unlinkedTitle = e2eTitle('Filter Unlinked Game');
+    const linkedLowRated = e2eTitle('Filter Linked Low Rated');
+    const linkedId = await seedGame(request, { title: linkedTitle, bggId: 999901, personalRating: 9 });
+    const unlinkedId = await seedGame(request, { title: unlinkedTitle });
+    const linkedLowId = await seedGame(request, { title: linkedLowRated, bggId: 999902, personalRating: 2 });
+
+    try {
+      await page.goto('/collection');
+
+      await page.locator('.filter-btn').click();
+      await page.getByRole('button', { name: 'BGG-linked', exact: true }).click();
+      await expect(page.getByRole('button', { name: linkedTitle })).toBeVisible();
+      await expect(page.getByRole('button', { name: linkedLowRated })).toBeVisible();
+      await expect(page.getByRole('button', { name: unlinkedTitle })).not.toBeVisible();
+      await expect(page.locator('.card__header h2')).toContainText('of');
+
+      // Sort should apply on top of the filter, not replace it. Compare the two seeded
+      // games' relative order rather than assuming either is first overall — the real
+      // collection may have its own games tied at the same rating.
+      await page.locator('.sort-btn').click();
+      await page.getByRole('button', { name: 'Highest rated' }).click();
+      const highRow = page.locator('.grid-tile', { has: page.getByRole('button', { name: linkedTitle }) });
+      const lowRow = page.locator('.grid-tile', { has: page.getByRole('button', { name: linkedLowRated }) });
+      const highIndex = await highRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+      const lowIndex = await lowRow.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+      expect(highIndex).toBeLessThan(lowIndex);
+      await expect(page.getByRole('button', { name: unlinkedTitle })).not.toBeVisible();
+
+      await page.locator('.filter-btn').click();
+      await page.getByRole('button', { name: 'Not linked', exact: true }).click();
+      await expect(page.getByRole('button', { name: unlinkedTitle })).toBeVisible();
+      await expect(page.getByRole('button', { name: linkedTitle })).not.toBeVisible();
+
+      await page.locator('.filter-btn').click();
+      await page.getByRole('button', { name: 'All games', exact: true }).click();
+      await expect(page.getByRole('button', { name: linkedTitle })).toBeVisible();
+      await expect(page.getByRole('button', { name: unlinkedTitle })).toBeVisible();
+    } finally {
+      await deleteGame(request, linkedId);
+      await deleteGame(request, unlinkedId);
+      await deleteGame(request, linkedLowId);
+    }
   });
 });

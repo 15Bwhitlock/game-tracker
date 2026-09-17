@@ -102,6 +102,11 @@ export class GameForm implements OnInit {
   readonly bggImporting = signal(false);
   readonly bggError = signal<string | null>(null);
   readonly bggImportedHit = signal<BggSearchHit | null>(null);
+  // Personal fields BGG has no concept of, still empty right after this import —
+  // shown in the confirmation so it's clear what's on you to fill in, not a static
+  // list that would claim something's missing even when it isn't (e.g. re-importing
+  // over a game where you'd already set a rating).
+  readonly bggMissingPersonalFields = signal<string[]>([]);
   // A game already in the collection whose bggId matches the one just imported —
   // a far more reliable duplicate signal than title text, since BGG ids never
   // vary the way a re-typed or slightly-different-cased title might.
@@ -436,6 +441,7 @@ export class GameForm implements OnInit {
           notes: details.description ? decodeBggDescription(details.description) : d.notes,
         }));
         this.bggImportedHit.set(hit);
+        this.bggMissingPersonalFields.set(this.computeMissingPersonalFields());
         this.bggDuplicateGame.set(this.allGames().find(g => g.bggId === hit.bggId) ?? null);
         this.bggResults.set([]);
         this.bggSearched.set(false);
@@ -449,12 +455,22 @@ export class GameForm implements OnInit {
     });
   }
 
+  // Only flags things worth nudging about — favorite/owned-since/series are
+  // legitimately optional per-game (most games won't have one), so leaving those
+  // blank isn't "missing" anything. Rating is the one BGG-blind field that's
+  // always meaningful to set, since it feeds this app's own suggestion scoring.
+  private computeMissingPersonalFields(): string[] {
+    const d = this.draft();
+    return d.personalRating == null ? ['a personal rating'] : [];
+  }
+
   clearBggImport(): void {
     if (this.preImportSnapshot) {
       this.draft.set(this.preImportSnapshot);
       this.preImportSnapshot = null;
     }
     this.bggImportedHit.set(null);
+    this.bggMissingPersonalFields.set([]);
     this.bggDuplicateGame.set(null);
   }
 
