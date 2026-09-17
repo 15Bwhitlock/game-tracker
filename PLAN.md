@@ -318,6 +318,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] "Refresh from BGG" button on the edit form for already-linked games — re-fetches and re-applies BGG data (title/players/time/complexity/categories/mechanics/images/year/best-player-counts/notes) without a fresh search; shares the same apply/confirm/Undo machinery as the add-form import
   - [x] Export/backup — "Export" button on the Collection page downloads the whole collection as a timestamped JSON file, client-side, no new endpoint
   - [x] Bulk actions in the Collection page — multi-select checkboxes (list and grid view) plus a "select all visible" checkbox; bulk-add a category/mechanic tag or bulk-delete every selected game
+  - [x] Suggest page grid view — same list/grid toggle as Collection, own `suggestViewMode` localStorage key, list stays the default
 
 ---
 
@@ -329,6 +330,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-16** — **Suggest page grid view.** Fifth of the "do it all" batch — the same list/grid toggle the Collection page got, applied to suggestion results, since a session's worth of possible games benefits from seeing cover art just as much as the collection does. New `.suggest-tile` cards mirror Collection's `.grid-tile` (cover image, rank badge, score badge, brief meta, reasons, Log Play), toggled via the same view-toggle button pair placed next to the "Results" heading. Persisted under its own `suggestViewMode` localStorage key rather than sharing Collection's `collectionViewMode` — list stays the *default* here (unlike Collection's grid default) since existing users' muscle memory and every existing e2e test already assume list-first results, and there was no request to change that default, only to add the option. New e2e test toggles to grid, confirms `.suggest-tile` replaces `<li class="suggestion">`, then reloads and re-runs the same search to confirm the preference (not just in-memory state) carried over — a suggestion search itself isn't persisted across a reload, so the test re-submits it rather than expecting stale results to reappear. 70 backend + 75 e2e tests pass.
 
 - **2026-09-16** — **Bulk actions in the Collection page (multi-select, bulk-delete, bulk-tag).** Fourth of the "do it all" batch. Added a checkbox to every row/tile (a new leftmost `<th>`/`<td>` in list view, an absolutely-positioned overlay in grid view) plus a "select all visible" checkbox in the table header — selection is a plain `Set<number>` of ids, not state on the `Game` objects themselves. A bulk-action bar appears once anything is selected: add one category or mechanic to every selected game at once (skipping games that already have it, via parallel `forkJoin` calls to the existing per-game `update()` endpoint — no new backend endpoint needed), or delete every selected game (its own confirmation dialog, separate from the single-game one). Caught a real regression while writing this: the new leftmost `<td>` shifted every column index by one, breaking two existing tests that located the Personal Rating cell by `td.nth(6)` — fixed both to `nth(7)` and left a comment naming the new column so the next index-based assertion doesn't repeat it. 70 backend + 74 e2e tests pass.
 

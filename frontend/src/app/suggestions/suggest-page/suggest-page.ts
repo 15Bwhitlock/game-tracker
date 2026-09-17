@@ -58,6 +58,19 @@ export class SuggestPage implements OnInit {
   readonly hasMore = computed(() => this.results().length < this.totalCount());
   readonly hasResults = computed(() => this.results().length > 0);
 
+  // Persisted like Collection's view-mode toggle — a per-viewer display preference,
+  // not data. A separate key from Collection's since the two pages' default (list here,
+  // grid there) reflects what suits each page's content, not a single shared choice.
+  private static readonly VIEW_MODE_KEY = 'suggestViewMode';
+  readonly viewMode = signal<'list' | 'grid'>(
+    (localStorage.getItem(SuggestPage.VIEW_MODE_KEY) as 'list' | 'grid' | null) ?? 'list'
+  );
+
+  setViewMode(mode: 'list' | 'grid'): void {
+    this.viewMode.set(mode);
+    localStorage.setItem(SuggestPage.VIEW_MODE_KEY, mode);
+  }
+
   readonly playerOptions = PLAYER_OPTIONS;
   readonly PLAYERS_UNLIMITED = PLAYERS_UNLIMITED;
   readonly timeOptions = TIME_OPTIONS;

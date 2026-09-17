@@ -224,16 +224,72 @@
 
   @if (hasSearched()) {
     <div class="card">
-      <h2>
-        Results
-        <span class="muted">({{ results().length }}{{ hasMore() ? ' of ' + totalCount() : '' }})</span>
-      </h2>
+      <div class="results-header">
+        <h2>
+          Results
+          <span class="muted">({{ results().length }}{{ hasMore() ? ' of ' + totalCount() : '' }})</span>
+        </h2>
+        @if (hasResults()) {
+          <div class="view-toggle" role="group" aria-label="Results view mode">
+            <button
+              type="button"
+              class="view-toggle__btn"
+              [class.active]="viewMode() === 'list'"
+              title="List view"
+              (click)="setViewMode('list')"
+            >☰</button>
+            <button
+              type="button"
+              class="view-toggle__btn"
+              [class.active]="viewMode() === 'grid'"
+              title="Grid view"
+              (click)="setViewMode('grid')"
+            >▦</button>
+          </div>
+        }
+      </div>
 
       @if (!hasResults()) {
         <p class="muted">
           Nothing in your collection fits. Try loosening the criteria — drop the time cap,
           widen the complexity range, or remove a category.
         </p>
+      } @else if (viewMode() === 'grid') {
+        <div class="suggestion-grid">
+          @for (sg of results(); track sg.game.id) {
+            <article class="suggest-tile">
+              <div class="suggest-tile__rank">{{ $index + 1 }}</div>
+              <span class="suggest-tile__score" title="Suggestion score">{{ sg.score | number:'1.1-1' }}</span>
+              <button type="button" class="suggest-tile__cover" (click)="openDetail(sg.game)">
+                @if (sg.game.imageUrl || sg.game.thumbnailUrl) {
+                  <img [src]="sg.game.imageUrl || sg.game.thumbnailUrl" alt="" />
+                } @else {
+                  <span class="suggest-tile__placeholder" aria-hidden="true">🎲</span>
+                }
+              </button>
+              <div class="suggest-tile__body">
+                <button type="button" class="title-btn suggest-tile__title" (click)="openDetail(sg.game)">{{ sg.game.title }}</button>
+                <p class="suggest-tile__meta muted">
+                  {{ sg.game.minPlayers }}–{{ sg.game.maxPlayers }} players
+                  @if (sg.game.personalRating != null) {
+                    <span class="dot">·</span>{{ sg.game.personalRating }}/10
+                  }
+                </p>
+                @if (sg.reasons.length) {
+                  <div class="suggest-tile__reasons muted">{{ sg.reasons.join(' · ') }}</div>
+                }
+                <button
+                  type="button"
+                  class="btn btn--sm suggest-tile__log"
+                  [class.btn--logged]="loggedIds().has(sg.game.id!)"
+                  [class.btn--ghost]="!loggedIds().has(sg.game.id!)"
+                  [disabled]="loggedIds().has(sg.game.id!)"
+                  (click)="logPlay(sg.game)"
+                >{{ loggedIds().has(sg.game.id!) ? '✓ Logged!' : 'Log play' }}</button>
+              </div>
+            </article>
+          }
+        </div>
       } @else {
         <ol class="suggestions">
           @for (sg of results(); track sg.game.id) {
@@ -295,13 +351,13 @@
             </li>
           }
         </ol>
-        @if (hasMore()) {
-          <div class="show-more">
-            <button type="button" class="btn btn--ghost" [disabled]="loadingMore()" (click)="showMore()">
-              @if (loadingMore()) { Loading… } @else { Show 10 more ({{ totalCount() - results().length }} remaining) }
-            </button>
-          </div>
-        }
+      }
+      @if (hasResults() && hasMore()) {
+        <div class="show-more">
+          <button type="button" class="btn btn--ghost" [disabled]="loadingMore()" (click)="showMore()">
+            @if (loadingMore()) { Loading… } @else { Show 10 more ({{ totalCount() - results().length }} remaining) }
+          </button>
+        </div>
       }
     </div>
   }
