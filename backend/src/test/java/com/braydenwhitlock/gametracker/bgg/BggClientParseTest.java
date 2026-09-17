@@ -114,6 +114,29 @@ class BggClientParseTest {
         assertThat(BggClient.parseThingXml("<garbage>")).isEmpty();
     }
 
+    @Test
+    void parsesHotListFromFixtureInRankOrder() throws IOException {
+        List<BggSearchHit> hits = BggClient.parseHotXml(load("bgg/hot-list.xml"));
+
+        assertThat(hits).hasSize(3);
+        assertThat(hits.get(0).bggId()).isEqualTo(13);
+        assertThat(hits.get(0).name()).isEqualTo("Catan");
+        assertThat(hits.get(0).yearPublished()).isEqualTo(1995);
+
+        assertThat(hits.get(1).bggId()).isEqualTo(30549);
+        assertThat(hits.get(1).name()).isEqualTo("Pandemic");
+
+        // Year missing in fixture (real BGG hot-list entries sometimes omit it) → null, not zero.
+        assertThat(hits.get(2).name()).isEqualTo("Oil Rock");
+        assertThat(hits.get(2).yearPublished()).isNull();
+    }
+
+    @Test
+    void emptyHotXmlReturnsEmptyList() {
+        assertThat(BggClient.parseHotXml("")).isEmpty();
+        assertThat(BggClient.parseHotXml(null)).isEmpty();
+    }
+
     private static String load(String path) throws IOException {
         return StreamUtils.copyToString(
                 new ClassPathResource(path).getInputStream(), StandardCharsets.UTF_8);

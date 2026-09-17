@@ -1,0 +1,230 @@
+<section class="page">
+  <header class="page__header">
+    <h1>Wishlist</h1>
+  </header>
+
+  @if (wishlistError()) {
+    <div class="alert alert--error" role="alert">{{ wishlistError() }}</div>
+  }
+
+  <div class="card">
+    <div class="field field--wide">
+      <span>
+        Search BoardGameGeek by name
+        <span class="field__optional">optional</span>
+      </span>
+      <div class="search-row">
+        <input
+          type="text"
+          placeholder="Search BoardGameGeek by name…"
+          [ngModel]="searchQuery()"
+          (ngModelChange)="searchQuery.set($event)"
+          (keydown)="onSearchKeydown($event)"
+          [ngModelOptions]="{ standalone: true }"
+          autocomplete="off"
+        />
+        <button
+          type="button"
+          class="btn btn--ghost btn--sm"
+          (click)="search()"
+          [disabled]="searching() || !searchQuery().trim()"
+        >{{ searching() ? 'Searching…' : 'Search' }}</button>
+      </div>
+
+      @if (searched() && searchResults().length === 0 && !searching() && !searchError()) {
+        <p class="muted search-status">No matches on BoardGameGeek.</p>
+      }
+      @if (searchError()) {
+        <div class="alert alert--error search-status" role="alert">{{ searchError() }}</div>
+      }
+      @if (searchResults().length > 0) {
+        <ul class="search-results">
+          @for (hit of searchResults(); track hit.bggId) {
+            <li class="search-result">
+              <span class="search-result__name">
+                {{ hit.name }}
+                @if (hit.yearPublished) {
+                  <span class="muted">({{ hit.yearPublished }})</span>
+                }
+              </span>
+              @if (ownedBggIds().has(hit.bggId)) {
+                <span class="tag-suggestion-badge">already own</span>
+              } @else if (wishlistBggIds().has(hit.bggId)) {
+                <span class="tag-suggestion-badge">in wishlist</span>
+              } @else {
+                <button
+                  type="button"
+                  class="btn btn--ghost btn--sm"
+                  [disabled]="addingBggId() === hit.bggId"
+                  (click)="addSearchHitToWishlist(hit)"
+                >{{ addingBggId() === hit.bggId ? 'Adding…' : 'Add to Wishlist' }}</button>
+              }
+            </li>
+          }
+        </ul>
+      }
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card__header">
+      <div class="view-toggle" role="group" aria-label="Wishlist view">
+        <button
+          type="button"
+          class="view-toggle__btn"
+          [class.active]="tab() === 'mine'"
+          (click)="selectTab('mine')"
+        >My Wishlist ({{ wishlist().length }})</button>
+        <button
+          type="button"
+          class="view-toggle__btn"
+          [class.active]="tab() === 'trending'"
+          (click)="selectTab('trending')"
+        >Browse Trending</button>
+      </div>
+    </div>
+
+    @if (availableCategories().length > 0 || availableMechanics().length > 0) {
+      <div class="chip-filters">
+        @if (availableCategories().length > 0) {
+          <div class="chip-group">
+            @for (cat of availableCategories(); track cat) {
+              <button
+                type="button"
+                class="category-chip"
+                [class.selected]="selectedCategories().includes(cat)"
+                (click)="toggleCategory(cat)"
+              >{{ cat }}</button>
+            }
+          </div>
+        }
+        @if (availableMechanics().length > 0) {
+          <div class="chip-group">
+            @for (m of availableMechanics(); track m) {
+              <button
+                type="button"
+                class="category-chip category-chip--mechanic"
+                [class.selected]="selectedMechanics().includes(m)"
+                (click)="toggleMechanic(m)"
+              >{{ m }}</button>
+            }
+          </div>
+        }
+      </div>
+    }
+
+    @if (tab() === 'mine') {
+      @if (loadingWishlist()) {
+        <p class="muted">Loading…</p>
+      } @else if (wishlist().length === 0) {
+        <p class="muted">Nothing on your wishlist yet — search above or browse trending games to add some.</p>
+      } @else if (filteredCards().length === 0) {
+        <p class="muted">No wishlist games match this filter.</p>
+      } @else {
+        <div class="wishlist-grid">
+          @for (card of filteredCards(); track card.wishlistId) {
+            <article class="wishlist-tile">
+              <div class="wishlist-tile__cover">
+                @if (card.imageUrl || card.thumbnailUrl) {
+                  <img [src]="card.imageUrl || card.thumbnailUrl" alt="" />
+                } @else {
+                  <span class="wishlist-tile__placeholder" aria-hidden="true">🎲</span>
+                }
+              </div>
+              <div class="wishlist-tile__body">
+                <h3 class="wishlist-tile__title">
+                  {{ card.title }}
+                  @if (card.yearPublished) {
+                    <span class="muted">({{ card.yearPublished }})</span>
+                  }
+                </h3>
+                @if (card.categories.length || card.mechanics.length) {
+                  <div class="wishlist-tile__tags">
+                    @for (cat of card.categories.slice(0, 3); track cat) {
+                      <span class="tag">{{ cat }}</span>
+                    }
+                    @for (m of card.mechanics.slice(0, Math.max(0, 3 - card.categories.length)); track m) {
+                      <span class="tag">{{ m }}</span>
+                    }
+                  </div>
+                }
+                @if (card.notes) {
+                  <p class="wishlist-tile__notes">{{ card.notes }}</p>
+                }
+                <div class="wishlist-tile__actions">
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm"
+                    [disabled]="movingId() === card.wishlistId"
+                    (click)="moveToCollection(card.wishlistId!)"
+                  >{{ movingId() === card.wishlistId ? 'Moving…' : 'Move to Collection' }}</button>
+                  <button
+                    type="button"
+                    class="btn btn--ghost btn--sm btn--icon-danger"
+                    (click)="remove(card.wishlistId!)"
+                  >Remove</button>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    } @else {
+      @if (loadingTrending()) {
+        <p class="muted">Loading BoardGameGeek's trending list — can take up to a minute the first time (BGG rate-limits how fast we can look up each game). Instant after that for a day.</p>
+      } @else if (trendingError()) {
+        <div class="alert alert--error" role="alert">{{ trendingError() }}</div>
+      } @else if (trending().length === 0) {
+        <p class="muted">No trending data available — is BGG_API_TOKEN configured?</p>
+      } @else if (filteredCards().length === 0) {
+        <p class="muted">No trending games match this filter.</p>
+      } @else {
+        <div class="wishlist-grid">
+          @for (card of filteredCards(); track card.bggId) {
+            <article class="wishlist-tile">
+              <div class="wishlist-tile__cover">
+                @if (card.imageUrl || card.thumbnailUrl) {
+                  <img [src]="card.imageUrl || card.thumbnailUrl" alt="" />
+                } @else {
+                  <span class="wishlist-tile__placeholder" aria-hidden="true">🎲</span>
+                }
+              </div>
+              <div class="wishlist-tile__body">
+                <h3 class="wishlist-tile__title">
+                  {{ card.title }}
+                  @if (card.yearPublished) {
+                    <span class="muted">({{ card.yearPublished }})</span>
+                  }
+                </h3>
+                @if (card.categories.length || card.mechanics.length) {
+                  <div class="wishlist-tile__tags">
+                    @for (cat of card.categories.slice(0, 3); track cat) {
+                      <span class="tag">{{ cat }}</span>
+                    }
+                    @for (m of card.mechanics.slice(0, Math.max(0, 3 - card.categories.length)); track m) {
+                      <span class="tag">{{ m }}</span>
+                    }
+                  </div>
+                }
+                <div class="wishlist-tile__actions">
+                  @if (card.bggId != null && ownedBggIds().has(card.bggId)) {
+                    <span class="tag-suggestion-badge">already own</span>
+                  } @else if (card.bggId != null && wishlistBggIds().has(card.bggId)) {
+                    <span class="tag-suggestion-badge">in wishlist</span>
+                  } @else {
+                    <button
+                      type="button"
+                      class="btn btn--ghost btn--sm"
+                      [disabled]="addingBggId() === card.bggId"
+                      (click)="addTrendingToWishlist(card.trendingSource!)"
+                    >{{ addingBggId() === card.bggId ? 'Adding…' : 'Add to Wishlist' }}</button>
+                  }
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      }
+    }
+  </div>
+</section>

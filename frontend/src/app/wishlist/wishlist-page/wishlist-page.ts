@@ -1,0 +1,273 @@
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
+
+import { BggApi, GameApi, WishlistApi } from '@shared/api';
+import { BggGameDetails, BggSearchHit, Wishlist } from '@shared/models';
+import { describeHttpError } from '@shared/services';
+
+type Tab = 'mine' | 'trending';
+
+// Common shape both "My Wishlist" (Wishlist) and "Browse Trending" (BggGameDetails)
+// cards render against, so one card template and one filter can serve both tabs.
+interface WishlistCard {
+  bggId: number | null;
+  title: string;
+  yearPublished: number | null;
+  thumbnailUrl: string | null;
+  imageUrl: string | null;
+  categories: string[];
+  mechanics: string[];
+  notes?: string | null;
+  wishlistId?: number; // present only for "mine" cards — needed for remove/move actions
+  trendingSource?: BggGameDetails; // present only for "trending" cards — needed to add
+}
+
+@Component({
+  selector: 'app-wishlist-page',
+  imports: [FormsModule],
+  templateUrl: './wishlist-page.html',
+  styleUrl: './wishlist-page.scss'
+})
+export class WishlistPage implements OnInit {
+  private readonly wishlistApi = inject(WishlistApi);
+  private readonly bggApi = inject(BggApi);
+  private readonly gameApi = inject(GameApi);
+  private readonly router = inject(Router);
+
+  readonly tab = signal<Tab>('mine');
+
+  readonly wishlist = signal<Wishlist[]>([]);
+  readonly loadingWishlist = signal(false);
+  readonly wishlistError = signal<string | null>(null);
+
+  readonly trending = signal<BggGameDetails[]>([]);
+  readonly trendingLoaded = signal(false);
+  readonly loadingTrending = signal(false);
+  readonly trendingError = signal<string | null>(null);
+
+  readonly ownedBggIds = signal<Set<number>>(new Set());
+  readonly wishlistBggIds = computed(() =>
+    new Set(this.wishlist().map(w => w.bggId).filter((id): id is number => id != null))
+  );
+
+  // Search-by-name — independent of which tab is active, mirrors GameForm's BGG import UI.
+  readonly searchQuery = signal('');
+  readonly searchResults = signal<BggSearchHit[]>([]);
+  readonly searching = signal(false);
+  readonly searched = signal(false);
+  readonly searchError = signal<string | null>(null);
+  readonly addingBggId = signal<number | null>(null);
+
+  readonly selectedCategories = signal<string[]>([]);
+  readonly selectedMechanics = signal<string[]>([]);
+
+  private readonly currentPool = computed<WishlistCard[]>(() =>
+    this.tab() === 'mine'
+      ? this.wishlist().map(w => ({
+          bggId: w.bggId ?? null,
+          title: w.title,
+          yearPublished: w.yearPublished ?? null,
+          thumbnailUrl: w.thumbnailUrl ?? null,
+          imageUrl: w.imageUrl ?? null,
+          categories: w.categories,
+          mechanics: w.mechanics,
+          notes: w.notes,
+          wishlistId: w.id
+        }))
+      : this.trending().map(g => ({
+          bggId: g.bggId,
+          title: g.title,
+          yearPublished: g.yearPublished,
+          thumbnailUrl: g.thumbnailUrl,
+          imageUrl: g.imageUrl,
+          categories: g.categories,
+          mechanics: g.mechanics,
+          trendingSource: g
+        }))
+  );
+
+  // Only categories/mechanics actually present in the current tab's pool — same
+  // "dynamic chip availability" idea as the Suggest page, just without a separate
+  // hard-filter layer underneath (the pool itself IS the filter base here).
+  readonly availableCategories = computed(() => {
+    const set = new Set<string>();
+    for (const item of this.currentPool()) for (const c of item.categories) set.add(c);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  });
+
+  readonly availableMechanics = computed(() => {
+    const set = new Set<string>();
+    for (const item of this.currentPool()) for (const m of item.mechanics) set.add(m);
+    return [...set].sort((a, b) => a.localeCompare(b));
+  });
+
+  readonly filteredCards = computed(() => {
+    const cats = this.selectedCategories();
+    const mechs = this.selectedMechanics();
+    return this.currentPool().filter(item => {
+      if (cats.length > 0 && !item.categories.some(c => cats.includes(c))) return false;
+      if (mechs.length > 0 && !item.mechanics.some(m => mechs.includes(m))) return false;
+      return true;
+    });
+  });
+
+  ngOnInit(): void {
+    this.loadWishlist();
+    this.gameApi.list().subscribe({
+      next: games => this.ownedBggIds.set(
+        new Set(games.map(g => g.bggId).filter((id): id is number => id != null))
+      )
+    });
+  }
+
+  private loadWishlist(): void {
+    this.loadingWishlist.set(true);
+    this.wishlistApi.list().subscribe({
+      next: items => {
+        this.wishlist.set(items);
+        this.loadingWishlist.set(false);
+      },
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.loadingWishlist.set(false);
+      }
+    });
+  }
+
+  selectTab(tab: Tab): void {
+    this.tab.set(tab);
+    this.selectedCategories.set([]);
+    this.selectedMechanics.set([]);
+    if (tab === 'trending' && !this.trendingLoaded()) {
+      this.loadTrending();
+    }
+  }
+
+  private loadTrending(): void {
+    this.loadingTrending.set(true);
+    this.trendingError.set(null);
+    this.bggApi.hot().subscribe({
+      next: games => {
+        this.trending.set(games);
+        this.trendingLoaded.set(true);
+        this.loadingTrending.set(false);
+      },
+      error: err => {
+        this.trendingError.set(describeHttpError(err));
+        this.loadingTrending.set(false);
+      }
+    });
+  }
+
+  toggleCategory(name: string): void {
+    this.selectedCategories.update(list =>
+      list.includes(name) ? list.filter(c => c !== name) : [...list, name]
+    );
+  }
+
+  toggleMechanic(name: string): void {
+    this.selectedMechanics.update(list =>
+      list.includes(name) ? list.filter(m => m !== name) : [...list, name]
+    );
+  }
+
+  onSearchKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      this.search();
+    }
+  }
+
+  search(): void {
+    const query = this.searchQuery().trim();
+    if (!query) return;
+    this.searching.set(true);
+    this.searchError.set(null);
+    this.bggApi.search(query).subscribe({
+      next: hits => {
+        this.searchResults.set(hits);
+        this.searched.set(true);
+        this.searching.set(false);
+      },
+      error: err => {
+        this.searchError.set(describeHttpError(err));
+        this.searching.set(false);
+      }
+    });
+  }
+
+  addSearchHitToWishlist(hit: BggSearchHit): void {
+    this.addingBggId.set(hit.bggId);
+    this.bggApi.details(hit.bggId).subscribe({
+      next: details => {
+        this.addDetailsToWishlist(details);
+        this.searchResults.set([]);
+        this.searched.set(false);
+        this.searchQuery.set('');
+      },
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.addingBggId.set(null);
+      }
+    });
+  }
+
+  addTrendingToWishlist(details: BggGameDetails): void {
+    this.addingBggId.set(details.bggId);
+    this.addDetailsToWishlist(details);
+  }
+
+  private addDetailsToWishlist(details: BggGameDetails): void {
+    const item: Wishlist = {
+      bggId: details.bggId,
+      title: details.title,
+      thumbnailUrl: details.thumbnailUrl,
+      imageUrl: details.imageUrl,
+      yearPublished: details.yearPublished,
+      minPlayers: details.minPlayers,
+      maxPlayers: details.maxPlayers,
+      minPlayTimeMinutes: details.minPlayTimeMinutes,
+      maxPlayTimeMinutes: details.maxPlayTimeMinutes,
+      complexityWeight: details.complexityWeight,
+      categories: details.categories,
+      mechanics: details.mechanics
+    };
+    this.wishlistApi.add(item).subscribe({
+      next: saved => {
+        this.wishlist.update(list => [...list, saved]);
+        this.addingBggId.set(null);
+      },
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.addingBggId.set(null);
+      }
+    });
+  }
+
+  remove(id: number): void {
+    this.wishlistApi.remove(id).subscribe({
+      next: () => this.wishlist.update(list => list.filter(w => w.id !== id)),
+      error: err => this.wishlistError.set(describeHttpError(err))
+    });
+  }
+
+  // One-click convert, same as any other BGG import: personal fields (rating,
+  // owned-since) start empty and can be filled in afterward via Edit — exactly how a
+  // fresh "Add Game" BGG import already works, so this doesn't need its own detour
+  // through a pre-filled form.
+  readonly movingId = signal<number | null>(null);
+
+  moveToCollection(id: number): void {
+    this.movingId.set(id);
+    this.wishlistApi.moveToCollection(id).subscribe({
+      next: () => this.router.navigate(['/collection']),
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.movingId.set(null);
+      }
+    });
+  }
+
+  readonly Math = Math;
+}

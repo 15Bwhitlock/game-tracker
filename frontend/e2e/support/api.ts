@@ -97,3 +97,44 @@ export async function deleteAllE2eGames(request: APIRequestContext): Promise<voi
   const stray = games.filter((g) => g.title.startsWith(E2E_TITLE_PREFIX));
   await Promise.all(stray.map((g) => deleteGame(request, g.id)));
 }
+
+export interface SeedWishlistOptions {
+  title: string;
+  bggId?: number | null;
+  categories?: string[];
+  mechanics?: string[];
+  notes?: string | null;
+}
+
+/** Creates a wishlist item via POST /api/wishlist and returns its id. */
+export async function seedWishlistItem(request: APIRequestContext, options: SeedWishlistOptions): Promise<number> {
+  const response = await request.post('/api/wishlist', {
+    data: {
+      title: options.title,
+      bggId: options.bggId ?? null,
+      categories: options.categories ?? [],
+      mechanics: options.mechanics ?? [],
+      notes: options.notes ?? null
+    }
+  });
+  expect(response.ok(), `seedWishlistItem failed: ${response.status()} ${await response.text()}`).toBeTruthy();
+  const body = await response.json();
+  return body.id as number;
+}
+
+/** Deletes a wishlist item by id; tolerates it already being gone. */
+export async function deleteWishlistItem(request: APIRequestContext, id: number): Promise<void> {
+  const response = await request.delete(`/api/wishlist/${id}`);
+  if (!response.ok() && response.status() !== 404) {
+    throw new Error(`deleteWishlistItem(${id}) failed: ${response.status()} ${await response.text()}`);
+  }
+}
+
+/** Deletes every wishlist item whose title starts with the e2e prefix. Safety-net afterAll. */
+export async function deleteAllE2eWishlistItems(request: APIRequestContext): Promise<void> {
+  const response = await request.get('/api/wishlist');
+  expect(response.ok()).toBeTruthy();
+  const items = (await response.json()) as Array<{ id: number; title: string }>;
+  const stray = items.filter((i) => i.title.startsWith(E2E_TITLE_PREFIX));
+  await Promise.all(stray.map((i) => deleteWishlistItem(request, i.id)));
+}

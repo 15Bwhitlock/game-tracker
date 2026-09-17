@@ -22,10 +22,11 @@ public class CacheConfig {
 
     public static final String BGG_SEARCH_CACHE = "bggSearch";
     public static final String BGG_THING_CACHE = "bggThing";
+    public static final String BGG_HOT_CACHE = "bggHot";
 
     @Bean
     public CacheManager cacheManager() {
-        CaffeineCacheManager manager = new CaffeineCacheManager(BGG_SEARCH_CACHE, BGG_THING_CACHE);
+        CaffeineCacheManager manager = new CaffeineCacheManager(BGG_SEARCH_CACHE, BGG_THING_CACHE, BGG_HOT_CACHE);
         manager.setCaffeine(Caffeine.newBuilder()
                 .maximumSize(500)
                 .expireAfterWrite(Duration.ofHours(24)));
