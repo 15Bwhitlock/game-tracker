@@ -212,7 +212,7 @@ Be selective. Chasing coverage on a personal project burns time without payoff. 
 - **Testcontainers** (`org.testcontainers:postgresql`) for integration tests — spins up a real Postgres in Docker per test class. Add a `@Testcontainers` base class to share the container across tests.
 - **`@DataJpaTest`** + Testcontainers for repository tests; **`@SpringBootTest`** for one or two end-to-end happy-path tests against the full stack.
 - **Playwright** (`frontend/e2e/`) for frontend e2e — see below.
-- Run tests in CI later if you set one up; for now, `mvn test` locally before committing is enough.
+- **GitHub Actions** (`.github/workflows/ci.yml`) runs both suites on every push/PR to `main` — see "CI" below.
 
 ### Rough target
 - ~80–90% coverage on `SuggestionService` and BGG parsing.
@@ -227,6 +227,14 @@ Reverses the earlier "skip frontend tests" call — see the 2026-09-11 decision 
 - **`workers: 1` is required, not a preference.** Different spec files sharing one real database means a game seeded by one file can be deleted by another file's cleanup mid-test if they run concurrently — hit this for real on the first run (`game-form.spec.ts`'s cleanup swept up a game `collection.spec.ts` had just seeded). Sequential execution is the fix; don't raise `workers` without re-solving that.
 - Run with `npm run test:e2e` (headless) or `npm run test:e2e:ui` (Playwright's UI mode) from `frontend/`, backend + Postgres already running.
 - Covers: collection list/search/log-play/delete, add/edit form including validation errors, suggestion criteria/presets/results including the "no player count" validation error, and the dictionary search. Deliberately does **not** cover `SuggestionCriteria`'s complexity-range validation (the `minComplexity`/`maxComplexity` bug fixed 2026-09-11) — the UI's button-group only ever submits 1–5, so that edge case is only reachable by calling the API directly and belongs in a backend unit/integration test instead, not e2e.
+
+### CI
+
+`.github/workflows/ci.yml` runs on every push/PR to `main`, as two jobs:
+
+- **`backend-tests`** — `./mvnw test`. Only reaches Maven's `test` phase, so the `frontend-maven-plugin` build (bound to `prepare-package`, later in the lifecycle) never runs — this job never touches Node. `GameRepositoryTest`'s Testcontainers Postgres comes from Docker on the runner directly; no `services:` entry needed for this job.
+- **`e2e-tests`** (needs `backend-tests`) — spins up a `postgres:15` service container matching `docker-compose.yml`'s credentials, starts the backend with `./mvnw spring-boot:run` in the background (same command a human runs locally, and it skips the Angular build for the same reason as above), waits for `/api/games` to respond, then runs `npx playwright test`. Playwright's own `webServer` config (see `playwright.config.ts`) starts the Angular dev server itself once `CI=true` — nothing extra needed for that half.
+- **No `BGG_API_TOKEN` secret configured, on purpose.** Every e2e test that depends on a real BGG lookup already self-skips when BGG returns no results (`test.skip(hits.length === 0, ...)`, added when the token requirement first landed) — this workflow would rather run those tests as a documented skip than either fail on missing config or hand a real secret to CI for a single-user personal project.
 
 ---
 
@@ -321,6 +329,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Suggest page grid view — same list/grid toggle as Collection, own `suggestViewMode` localStorage key, list stays the default
   - [x] Dictionary → Collection link — every category/mechanic name in the Dictionary links to `/collection?search=<name>`, reusing Collection's existing search-param handling
   - [x] Notes per play session — `game_plays.notes` (V13 migration), settable when logging a play or afterward via `PATCH /api/games/{id}/plays/{playId}`; edited inline in the edit form's play history, shown read-only in both detail modals
+  - [x] GitHub Actions CI (`.github/workflows/ci.yml`) — backend tests + full e2e suite (own Postgres service container + a live backend) on every push/PR to `main`
 
 ---
 
@@ -332,6 +341,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-17** — **GitHub Actions CI.** Last of the "do it all" batch. `.github/workflows/ci.yml` runs on every push/PR to `main` as two jobs: `backend-tests` (`./mvnw test` — never touches the frontend, since `frontend-maven-plugin` is bound to the later `prepare-package` phase; `GameRepositoryTest`'s Testcontainers Postgres comes straight from the runner's preinstalled Docker, no service container needed) and `e2e-tests` (a `postgres:15` service container matching `docker-compose.yml`'s credentials, the backend started with `./mvnw spring-boot:run` in the background — the same command PLAN.md already tells a human to run, and it skips the Angular build — then `npx playwright test`, which starts the Angular dev server itself via `playwright.config.ts`'s existing `webServer` option once `CI=true`). Deliberately configured no `BGG_API_TOKEN` secret: every e2e test that needs a real BGG lookup already self-skips when BGG returns nothing (`test.skip(hits.length === 0, ...)`, added back when the token requirement first landed) — this workflow would rather run those as a documented skip than hand a real secret to CI for a single-user personal project. Added a CI status badge to the README. This is the last of the 8 improvements from the 2026-09-16 "what else can you improve?" / "do it all" batch.
 
 - **2026-09-16** — **Notes per play session.** Seventh of the "do it all" batch — play history previously recorded only a date. Added a nullable `notes` column to `game_plays` (V13 migration), a `GamePlay.notes` field, an optional `notes` on the existing `POST /plays` request body, and a new `PATCH /api/games/{id}/plays/{playId}` endpoint for setting or clearing a note after the fact. Deliberately kept the quick "Log play" button on Collection/Suggest frictionless (still a single click, no dialog) — notes are added afterward via the edit form's play history list, where each entry gets a 📝 button that reveals an inline textarea, saved immediately via PATCH (unlike removing a play, which stays pending until the whole form is saved, since deleting a play is destructive and worth a last chance to back out of via Cancel — a note is not). Collection's and Suggest's read-only detail-modal play history lists now show the note inline (`— <note>`) next to the date when one exists. 72 backend + 78 e2e tests pass.
 
