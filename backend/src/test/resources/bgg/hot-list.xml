@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<items termsofuse="https://boardgamegeek.com/xmlapi/termsofuse">
+    <item id="13" rank="1">
+        <thumbnail value="https://cf.geekdo-images.com/example/thumb1.jpg"/>
+        <name value="Catan"/>
+        <yearpublished value="1995"/>
+    </item>
+    <item id="30549" rank="2">
+        <thumbnail value="https://cf.geekdo-images.com/example/thumb2.jpg"/>
+        <name value="Pandemic"/>
+        <yearpublished value="2008"/>
+    </item>
+    <item id="470814" rank="3">
+        <thumbnail value="https://cf.geekdo-images.com/example/thumb3.jpg"/>
+        <name value="Oil Rock"/>
+    </item>
+</items>

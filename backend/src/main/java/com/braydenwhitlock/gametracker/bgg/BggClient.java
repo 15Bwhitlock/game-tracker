@@ -8,6 +8,7 @@ import com.fasterxml.jackson.dataformat.xml.XmlMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
 import org.springframework.boot.http.client.ClientHttpRequestFactorySettings;
 import org.springframework.cache.annotation.Cacheable;
@@ -59,6 +60,13 @@ public class BggClient {
     // distinct from our own Caffeine cache. Retry a few times before giving up.
     private static final int THING_MAX_RETRIES = 3;
     private static final Duration THING_RETRY_DELAY = Duration.ofSeconds(2);
+    // BGG's rate limit is tighter than it looks from a single lookup — discovered when
+    // the wishlist hot-list feature made ~50 sequential /thing calls with no pacing and
+    // BGG 429'd roughly a third of them. A flat delay before every actual outbound
+    // request (never on a cache hit — @Cacheable short-circuits before fetchThingXml is
+    // even called) keeps us comfortably under their limit. Harmless on the common single-
+    // lookup path (one BGG import), where it's imperceptible.
+    private static final Duration THING_REQUEST_PACING = Duration.ofMillis(500);
 
     // Matches a bare integer or a range like "3-4"/"3–4" (BGG uses both a hyphen and an
     // en dash depending on endpoint/era) inside text like "Best with 2–4, 6 players".
@@ -66,9 +74,18 @@ public class BggClient {
 
     private final RestClient restClient;
     private final String apiToken;
+    // Spring's @Cacheable proxy only intercepts calls that come in *through* the proxy —
+    // a plain `this.getDetails(...)` from within this same class (self-invocation) skips
+    // the proxy entirely and silently bypasses caching. getHotListWithDetails() needs to
+    // call the cached getDetails() ~50 times per request, so it goes through this
+    // self-reference instead of `this`. @Lazy breaks the otherwise-circular dependency
+    // (the proxy needs the fully-constructed bean, which needs the proxy) — standard
+    // Spring pattern for exactly this situation.
+    private final BggClient self;
 
     public BggClient(@Value("${bgg.base-url:https://boardgamegeek.com}") String baseUrl,
-                      @Value("${bgg.api-token:}") String apiToken) {
+                      @Value("${bgg.api-token:}") String apiToken,
+                      @Lazy BggClient self) {
         ClientHttpRequestFactory requestFactory = ClientHttpRequestFactoryBuilder.detect()
                 .build(ClientHttpRequestFactorySettings.defaults()
                         .withConnectTimeout(CONNECT_TIMEOUT)
@@ -79,6 +96,7 @@ public class BggClient {
                 .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
                 .build();
         this.apiToken = apiToken;
+        this.self = self;
         if (apiToken == null || apiToken.isBlank()) {
             log.warn("No BGG_API_TOKEN configured — BGG requires a registered app token as of "
                     + "Oct 2025, so search/lookup will return empty results until one is set.");
@@ -115,6 +133,48 @@ public class BggClient {
     }
 
     /**
+     * Fetches BGG's current "hot list" — the ~50 currently-trending games — enriched with
+     * full details (categories, mechanics, player count, etc.) via {@link #getDetails}, so
+     * callers can filter/sort by category the same way they would the owned collection.
+     *
+     * <p>The raw hot-list call is itself cached for 24h; each item's enrichment reuses the
+     * existing {@link CacheConfig#BGG_THING_CACHE}. The very first call after a cache miss is
+     * slow (up to ~50 sequential {@code /thing} lookups, each with its own retry-on-202
+     * handling) — acceptable for a personal app hit occasionally, and near-instant on repeat
+     * visits within the 24h window. Items BGG couldn't resolve (rare — e.g. deleted between
+     * the hot-list snapshot and the lookup) are silently skipped rather than failing the batch.
+     */
+    public List<BggGameDetails> getHotListWithDetails() {
+        List<BggGameDetails> enriched = new ArrayList<>();
+        for (BggSearchHit hit : self.hotList()) {
+            self.getDetails(hit.bggId()).ifPresent(enriched::add);
+        }
+        return enriched;
+    }
+
+    /**
+     * Fetches the raw hot list (rank order, id/name/year only — no category data yet).
+     * Cached for 24 hours, same TTL as search/thing.
+     */
+    @Cacheable(value = CacheConfig.BGG_HOT_CACHE)
+    public List<BggSearchHit> hotList() {
+        String xml;
+        try {
+            xml = restClient.get()
+                    .uri(uri -> uri.path("/xmlapi2/hot")
+                            .queryParam("type", "boardgame")
+                            .build())
+                    .headers(this::addAuthHeader)
+                    .retrieve()
+                    .body(String.class);
+        } catch (RestClientResponseException e) {
+            log.warn("BGG hot list fetch failed ({})", e.getStatusCode());
+            return List.of();
+        }
+        return parseHotXml(xml);
+    }
+
+    /**
      * Fetches full BGG metadata for the given numeric BGG id. Returns empty if BGG has no
      * matching item (e.g. the id was deleted).
      *
@@ -137,6 +197,7 @@ public class BggClient {
      * times before giving up. A non-202 response — success or error — returns immediately.
      */
     private String fetchThingXml(int bggId) {
+        sleepQuietly(THING_REQUEST_PACING);
         for (int attempt = 0; attempt <= THING_MAX_RETRIES; attempt++) {
             ResponseEntity<String> response = restClient.get()
                     .uri(uri -> uri.path("/xmlapi2/thing")
@@ -203,6 +264,17 @@ public class BggClient {
                     parseInteger(item.getYearPublished())));
         }
         return hits;
+    }
+
+    /**
+     * Parses a BGG hot-list XML response. Reuses {@link #parseSearchXml} — the hot list's
+     * {@code <item><name value/><yearpublished value/></item>} shape is identical to search
+     * results' (the extra {@code rank} attribute and {@code <thumbnail>} element are just
+     * silently skipped by {@code BggSearchResponse}'s {@code ignoreUnknown = true}). Package-
+     * private so tests can drive it with a saved fixture, same as the other parsers.
+     */
+    static List<BggSearchHit> parseHotXml(String xml) {
+        return parseSearchXml(xml);
     }
 
     /**

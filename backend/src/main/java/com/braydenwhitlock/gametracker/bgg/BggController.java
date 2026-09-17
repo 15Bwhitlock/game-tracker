@@ -47,4 +47,14 @@ public class BggController {
                 .map(ResponseEntity::ok)
                 .orElseGet(() -> ResponseEntity.notFound().build());
     }
+
+    /**
+     * Returns BGG's current hot list, enriched with full details so the Wishlist page can
+     * filter by category. Empty list (not an error) when no BGG_API_TOKEN is configured.
+     */
+    @Operation(summary = "Get BGG's current hot list, enriched with full details")
+    @GetMapping("/hot")
+    public List<BggGameDetails> hot() {
+        return bggClient.getHotListWithDetails();
+    }
 }

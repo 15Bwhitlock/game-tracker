@@ -1,5 +1,7 @@
 export type { Game } from './game';
 export { emptyGame } from './game';
+export type { Wishlist } from './wishlist';
+export { emptyWishlistItem } from './wishlist';
 export type { ScoredGame, SuggestionCriteria, SuggestionPage } from './suggestion';
 export { GAME_CATEGORIES } from './game-categories';
 export { GAME_MECHANICS } from './game-mechanics';

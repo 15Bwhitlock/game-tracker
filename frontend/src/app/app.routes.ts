@@ -41,6 +41,14 @@ export const routes: Routes = [
       import('./suggestions/suggest-page/suggest-page').then((m) => m.SuggestPage)
   },
 
+  // Wishlist — games not yet owned, kept for future reference. Browse BGG's
+  // trending list or search by name, filter either by category, and add.
+  {
+    path: 'wishlist',
+    loadComponent: () =>
+      import('./wishlist/wishlist-page/wishlist-page').then((m) => m.WishlistPage)
+  },
+
   // Reference page — searchable list of all preset categories and mechanics
   // with descriptions, so you can look up what they mean while filling in a game.
   {

@@ -18,4 +18,11 @@ export class BggApi {
   details(bggId: number): Observable<BggGameDetails> {
     return this.http.get<BggGameDetails>(`${this.baseUrl}/${bggId}`);
   }
+
+  // BGG's current "hot list" (~50 trending games), enriched server-side with full
+  // details so results can be filtered by category. Empty array (not an error) when
+  // no BGG_API_TOKEN is configured.
+  hot(): Observable<BggGameDetails[]> {
+    return this.http.get<BggGameDetails[]>(`${this.baseUrl}/hot`);
+  }
 }
