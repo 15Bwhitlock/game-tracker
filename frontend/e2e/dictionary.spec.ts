@@ -16,9 +16,9 @@ test.describe('Dictionary page', () => {
 
     // A known preset mechanic (see game-mechanics.ts) — filtering to it should
     // hide unrelated entries and the reference sections that only show when unfiltered.
-    await search.fill('Cooperative Play');
+    await search.fill('Cooperative Game');
     await expect(page.getByRole('heading', { name: 'Complexity Scale' })).not.toBeVisible();
-    await expect(page.locator('.entry__name', { hasText: 'Cooperative Play' }).first()).toBeVisible();
+    await expect(page.locator('.entry__name', { hasText: 'Cooperative Game' }).first()).toBeVisible();
 
     await search.fill('__no_such_term_should_exist__');
     await expect(page.getByText(/No categories match/)).toBeVisible();
