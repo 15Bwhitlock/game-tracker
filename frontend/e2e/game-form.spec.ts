@@ -441,4 +441,53 @@ test.describe('Add / edit game form', () => {
 
     await deleteGame(request, id);
   });
+
+  test('refresh-from-BGG button re-fetches and re-applies BGG data on an already-linked game', async ({ page, request }) => {
+    const title = e2eTitle('refresh flow');
+    // bggId 13 is Catan (used throughout this suite's other real-BGG-lookup tests).
+    // Seed with obviously-stale metadata a refresh should overwrite.
+    const id = await seedGame(request, {
+      title, bggId: 13, minPlayers: 2, maxPlayers: 2, minPlayTimeMinutes: 15, maxPlayTimeMinutes: 15,
+      categories: [], mechanics: []
+    });
+
+    await page.goto(`/games/${id}/edit`);
+    await expect(page.getByRole('button', { name: 'Refresh from BGG' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Refresh from BGG' }).click();
+    const confirmation = page.locator('.bgg-import__confirm');
+    await expect(confirmation).toContainText('Refreshed from');
+    await expect(confirmation).toContainText('Catan');
+
+    // Catan is 3-4 players per the real BGG listing, not the stale 2-2 seeded above.
+    await expect(
+      page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '3', exact: true })
+    ).toHaveClass(/selected/);
+    await expect(
+      page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '4', exact: true })
+    ).toHaveClass(/selected/);
+
+    await deleteGame(request, id);
+  });
+
+  test('Undo after a refresh-from-BGG restores the game to exactly what it was before', async ({ page, request }) => {
+    const title = e2eTitle('refresh undo flow');
+    const id = await seedGame(request, {
+      title, bggId: 13, minPlayers: 2, maxPlayers: 2, minPlayTimeMinutes: 15, maxPlayTimeMinutes: 15,
+      categories: [], mechanics: [], notes: 'my own notes'
+    });
+
+    await page.goto(`/games/${id}/edit`);
+    await page.getByRole('button', { name: 'Refresh from BGG' }).click();
+    await expect(page.getByText(/Refreshed from/)).toBeVisible();
+
+    await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.getByText(/Refreshed from/)).not.toBeVisible();
+    await expect(
+      page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true })
+    ).toHaveClass(/selected/);
+    await expect(page.getByPlaceholder('Personal thoughts, setup tips, best configurations…')).toHaveValue('my own notes');
+
+    await deleteGame(request, id);
+  });
 });

@@ -6,7 +6,7 @@ import { Observable, forkJoin } from 'rxjs';
 import { switchMap, tap } from 'rxjs/operators';
 
 import { BggApi, GameApi, GamePlay } from '@shared/api';
-import { BggSearchHit, Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
+import { BggGameDetails, BggSearchHit, Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
 import { describeHttpError, formatTime, formatDate } from '@shared/services';
 
 interface TagSuggestion {
@@ -100,6 +100,9 @@ export class GameForm implements OnInit {
   readonly bggSearching = signal(false);
   readonly bggSearched = signal(false);
   readonly bggImporting = signal(false);
+  // Re-fetching BGG data for a game that's already linked (edit mode) — distinct from
+  // bggImporting so the two loading states never fight over the same UI text.
+  readonly bggRefreshing = signal(false);
   readonly bggError = signal<string | null>(null);
   readonly bggImportedHit = signal<BggSearchHit | null>(null);
   // Personal fields BGG has no concept of, still empty right after this import —
@@ -414,35 +417,40 @@ export class GameForm implements OnInit {
     });
   }
 
+  // Shared by importBggGame (add mode) and refreshFromBgg (edit mode) — both need to
+  // merge freshly-fetched BGG data into the draft the same way, snapshotting first so
+  // Undo can restore exactly what was there before, including Notes (which this always
+  // overwrites, per explicit request: a lookup should always replace Notes with the
+  // looked-up game's description, even over text you typed yourself).
+  private applyBggDetails(details: BggGameDetails): void {
+    this.preImportSnapshot = this.draft();
+    this.draft.update(d => ({
+      ...d,
+      bggId: details.bggId,
+      title: details.title || d.title,
+      minPlayers: snapPlayerCount(details.minPlayers) ?? d.minPlayers,
+      maxPlayers: snapPlayerCount(details.maxPlayers) ?? d.maxPlayers,
+      minPlayTimeMinutes: snapPlayTime(details.minPlayTimeMinutes) ?? d.minPlayTimeMinutes,
+      maxPlayTimeMinutes: snapPlayTime(details.maxPlayTimeMinutes) ?? d.maxPlayTimeMinutes,
+      complexityWeight: snapComplexity(details.complexityWeight) ?? d.complexityWeight,
+      categories: details.categories.length > 0 ? details.categories : d.categories,
+      mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
+      thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
+      imageUrl: details.imageUrl ?? d.imageUrl,
+      yearPublished: details.yearPublished ?? d.yearPublished,
+      bestPlayerCounts: details.bestPlayerCounts.length > 0 ? details.bestPlayerCounts : d.bestPlayerCounts,
+      notes: details.description ? decodeBggDescription(details.description) : d.notes,
+    }));
+    this.bggImportedHit.set({ bggId: details.bggId, name: details.title, yearPublished: details.yearPublished });
+    this.bggMissingPersonalFields.set(this.computeMissingPersonalFields());
+  }
+
   importBggGame(hit: BggSearchHit): void {
     this.bggImporting.set(true);
     this.bggError.set(null);
     this.bggApi.details(hit.bggId).subscribe({
       next: (details) => {
-        // Undo needs to restore exactly what was here before — including Notes, which
-        // this always overwrites below (per explicit request: a lookup should always
-        // replace Notes with the new game's description, even over text you typed
-        // yourself). Snapshotting first is what makes that safe to do unconditionally.
-        this.preImportSnapshot = this.draft();
-        this.draft.update(d => ({
-          ...d,
-          bggId: details.bggId,
-          title: details.title || d.title,
-          minPlayers: snapPlayerCount(details.minPlayers) ?? d.minPlayers,
-          maxPlayers: snapPlayerCount(details.maxPlayers) ?? d.maxPlayers,
-          minPlayTimeMinutes: snapPlayTime(details.minPlayTimeMinutes) ?? d.minPlayTimeMinutes,
-          maxPlayTimeMinutes: snapPlayTime(details.maxPlayTimeMinutes) ?? d.maxPlayTimeMinutes,
-          complexityWeight: snapComplexity(details.complexityWeight) ?? d.complexityWeight,
-          categories: details.categories.length > 0 ? details.categories : d.categories,
-          mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
-          thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
-          imageUrl: details.imageUrl ?? d.imageUrl,
-          yearPublished: details.yearPublished ?? d.yearPublished,
-          bestPlayerCounts: details.bestPlayerCounts.length > 0 ? details.bestPlayerCounts : d.bestPlayerCounts,
-          notes: details.description ? decodeBggDescription(details.description) : d.notes,
-        }));
-        this.bggImportedHit.set(hit);
-        this.bggMissingPersonalFields.set(this.computeMissingPersonalFields());
+        this.applyBggDetails(details);
         this.bggDuplicateGame.set(this.allGames().find(g => g.bggId === hit.bggId) ?? null);
         this.bggResults.set([]);
         this.bggSearched.set(false);
@@ -452,6 +460,26 @@ export class GameForm implements OnInit {
       error: (err) => {
         this.bggError.set(describeHttpError(err));
         this.bggImporting.set(false);
+      }
+    });
+  }
+
+  // Re-fetches the linked game's BGG data and re-applies it to the draft — for when
+  // BGG's own listing has been corrected/expanded since this game was first imported.
+  // Only available once a game already carries a bggId (i.e. in edit mode).
+  refreshFromBgg(): void {
+    const bggId = this.draft().bggId;
+    if (bggId == null) return;
+    this.bggRefreshing.set(true);
+    this.bggError.set(null);
+    this.bggApi.details(bggId).subscribe({
+      next: (details) => {
+        this.applyBggDetails(details);
+        this.bggRefreshing.set(false);
+      },
+      error: (err) => {
+        this.bggError.set(describeHttpError(err));
+        this.bggRefreshing.set(false);
       }
     });
   }

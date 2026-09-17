@@ -95,6 +95,39 @@
     </div>
   }
 
+  @if (editId() && draft().bggId) {
+    <div class="card bgg-import">
+      <div class="field field--wide">
+        <span>BoardGameGeek data</span>
+        <div class="bgg-import__row">
+          <button
+            type="button"
+            class="btn btn--ghost btn--sm"
+            (click)="refreshFromBgg()"
+            [disabled]="bggRefreshing()"
+          >{{ bggRefreshing() ? 'Refreshing…' : 'Refresh from BGG' }}</button>
+        </div>
+
+        @if (bggError()) {
+          <div class="alert alert--error bgg-import__status" role="alert">{{ bggError() }}</div>
+        }
+        @if (bggImportedHit()) {
+          <p class="bgg-import__confirm">
+            ✓ Refreshed from <strong>{{ bggImportedHit()?.name }}</strong>
+            @if (bggImportedHit()?.yearPublished) {
+              ({{ bggImportedHit()?.yearPublished }})
+            }
+            — fields below were updated.
+            @if (bggMissingPersonalFields().length > 0) {
+              BGG doesn't know {{ bggMissingPersonalFields().join(' or ') }} — that's still up to you.
+            }
+            <button type="button" class="btn btn--ghost btn--sm" (click)="clearBggImport()">Undo</button>
+          </p>
+        }
+      </div>
+    </div>
+  }
+
   <div class="card">
     @if (loading()) {
       <p class="muted">Loading…</p>
