@@ -17,13 +17,50 @@
     <div class="card__header">
       <h2>
         Games
-        @if (searchTerm().trim()) {
+        @if (searchTerm().trim() || bggFilter() !== 'all') {
           ({{ filteredGames().length }} of {{ games().length }})
         } @else {
           ({{ games().length }})
         }
       </h2>
       <div class="card__controls">
+        <div class="view-toggle" role="group" aria-label="View mode">
+          <button
+            type="button"
+            class="view-toggle__btn"
+            [class.active]="viewMode() === 'list'"
+            title="List view"
+            (click)="setViewMode('list')"
+          >☰</button>
+          <button
+            type="button"
+            class="view-toggle__btn"
+            [class.active]="viewMode() === 'grid'"
+            title="Grid view"
+            (click)="setViewMode('grid')"
+          >▦</button>
+        </div>
+        <div class="filter-wrapper">
+          <button
+            type="button"
+            class="btn btn--ghost filter-btn"
+            [class.active]="bggFilter() !== 'all'"
+            title="Filter by BGG link"
+            (click)="filterOpen.set(!filterOpen())"
+          >{{ bggFilterLabel() }}</button>
+          @if (filterOpen()) {
+            <div class="sort-dropdown">
+              @for (opt of bggFilterOptions; track opt.key) {
+                <button
+                  type="button"
+                  class="sort-option"
+                  [class.selected]="bggFilter() === opt.key"
+                  (click)="setBggFilter(opt.key)"
+                >{{ opt.label }}</button>
+              }
+            </div>
+          }
+        </div>
         <div class="sort-wrapper">
           <button
             type="button"
@@ -94,7 +131,60 @@
     } @else if (games().length === 0) {
       <p class="muted">No games yet — click "Add game" to add your first one.</p>
     } @else if (filteredGames().length === 0) {
-      <p class="muted">No games match "{{ searchTerm() }}".</p>
+      <p class="muted">
+        @if (searchTerm().trim()) {
+          No games match "{{ searchTerm() }}".
+        } @else {
+          No games match this filter.
+        }
+      </p>
+    } @else if (viewMode() === 'grid') {
+      <div class="game-grid">
+        @for (game of filteredGames(); track game.id) {
+          <article class="grid-tile">
+            <button type="button" class="grid-tile__cover" (click)="openDetail(game)">
+              @if (game.imageUrl || game.thumbnailUrl) {
+                <img [src]="game.imageUrl || game.thumbnailUrl" alt="" />
+              } @else {
+                <span class="grid-tile__placeholder" aria-hidden="true">🎲</span>
+              }
+            </button>
+            <button
+              type="button"
+              class="btn btn--icon star-btn grid-tile__star"
+              [class.active]="game.favorite"
+              [title]="game.favorite ? 'Remove from favorites' : 'Add to favorites'"
+              (click)="toggleFavorite(game)"
+            >{{ game.favorite ? '★' : '☆' }}</button>
+            <div class="grid-tile__body">
+              <button type="button" class="title-btn grid-tile__title" (click)="openDetail(game)">{{ game.title }}</button>
+              <p class="grid-tile__meta muted">
+                @if (game.minPlayers === game.maxPlayers) {
+                  {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
+                } @else {
+                  {{ game.minPlayers }}–{{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.maxPlayers }}
+                }
+                players
+                @if (game.personalRating != null) {
+                  <span class="dot">·</span>{{ game.personalRating }}/10
+                }
+              </p>
+              <div class="grid-tile__actions">
+                <button
+                  type="button"
+                  class="btn btn--icon"
+                  [class.btn--logged-icon]="loggedIds().has(game.id!)"
+                  [disabled]="loggedIds().has(game.id!)"
+                  [title]="loggedIds().has(game.id!) ? 'Logged!' : 'Log play'"
+                  (click)="logPlay(game)"
+                >{{ loggedIds().has(game.id!) ? '✓' : '▶️' }}</button>
+                <a [routerLink]="['/games', game.id, 'edit']" [queryParams]="searchTerm() ? { search: searchTerm() } : {}" class="btn btn--icon" title="Edit">✏️</a>
+                <button type="button" class="btn btn--icon btn--icon-danger" title="Delete" (click)="confirmDelete(game)">🗑️</button>
+              </div>
+            </div>
+          </article>
+        }
+      </div>
     } @else {
       <table class="table">
         <thead>

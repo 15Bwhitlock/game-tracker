@@ -51,6 +51,39 @@ export class GameList implements OnInit {
   readonly sortKey = signal<SortKey>('title-asc');
   readonly sortOpen = signal(false);
 
+  // Persisted like ThemeService's dark-mode choice — a per-viewer display preference,
+  // not data, so localStorage is the right home for it rather than the backend.
+  private static readonly VIEW_MODE_KEY = 'collectionViewMode';
+  readonly viewMode = signal<ViewMode>(
+    (localStorage.getItem(GameList.VIEW_MODE_KEY) as ViewMode | null) ?? 'grid'
+  );
+
+  setViewMode(mode: ViewMode): void {
+    this.viewMode.set(mode);
+    localStorage.setItem(GameList.VIEW_MODE_KEY, mode);
+  }
+
+  // Independent of sort/search — combines with both. "linked"/"unlinked" refer to
+  // whether a game has a bggId (was imported from BoardGameGeek at some point).
+  readonly bggFilter = signal<BggFilter>('all');
+
+  readonly bggFilterOptions: { key: BggFilter; label: string }[] = [
+    { key: 'all',      label: 'All games' },
+    { key: 'linked',   label: 'BGG-linked' },
+    { key: 'unlinked', label: 'Not linked' },
+  ];
+
+  readonly filterOpen = signal(false);
+
+  readonly bggFilterLabel = computed(() =>
+    this.bggFilterOptions.find(o => o.key === this.bggFilter())?.label ?? 'All games'
+  );
+
+  setBggFilter(filter: BggFilter): void {
+    this.bggFilter.set(filter);
+    this.filterOpen.set(false);
+  }
+
   readonly searchSuggestions = computed<{ label: string; items: string[] }[]>(() => {
     const term = this.searchTerm().trim().toLowerCase();
     if (!term) return [];
@@ -79,8 +112,12 @@ export class GameList implements OnInit {
     const term = this.searchTerm().trim().toLowerCase();
     const asNumber = Number(term);
     const numeric = Number.isFinite(asNumber);
+    const bggFilter = this.bggFilter();
 
     const filtered = this.games().filter((g) => {
+      if (bggFilter === 'linked' && g.bggId == null) return false;
+      if (bggFilter === 'unlinked' && g.bggId != null) return false;
+
       if (!term) return true;
       if (g.title.toLowerCase().includes(term)) return true;
       if (g.categories.some((c) => c?.toLowerCase().includes(term))) return true;
@@ -251,10 +288,15 @@ export class GameList implements OnInit {
     if (this.sortOpen() && !(e.target as HTMLElement).closest('.sort-wrapper')) {
       this.sortOpen.set(false);
     }
+    if (this.filterOpen() && !(e.target as HTMLElement).closest('.filter-wrapper')) {
+      this.filterOpen.set(false);
+    }
   }
 }
 
 type SortKey = 'title-asc' | 'title-desc' | 'favorites' | 'plays-desc' | 'plays-asc' | 'last-played' | 'rating-desc';
+type ViewMode = 'list' | 'grid';
+type BggFilter = 'all' | 'linked' | 'unlinked';
 
 function sortComparator(key: SortKey): (a: Game, b: Game) => number {
   switch (key) {
