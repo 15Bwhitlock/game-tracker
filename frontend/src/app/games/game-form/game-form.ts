@@ -142,6 +142,12 @@ export class GameForm implements OnInit {
     this.playHistory().map(p => ({ play: p, pending: this.pendingRemovals().includes(p.id) }))
   );
 
+  // Notes are edited inline, one play at a time — id of the play currently being
+  // edited (null when none is), plus the textarea's draft value.
+  readonly editingPlayNoteId = signal<number | null>(null);
+  readonly editingPlayNoteValue = signal('');
+  readonly savingPlayNote = signal(false);
+
   readonly customCategoryInput = signal('');
   readonly categoryInputFocused = signal(false);
   readonly categoryHighlightIdx = signal(-1);
@@ -789,6 +795,40 @@ export class GameForm implements OnInit {
 
   restorePlay(play: GamePlay): void {
     this.pendingRemovals.update(ids => ids.filter(id => id !== play.id));
+  }
+
+  startEditPlayNote(play: GamePlay): void {
+    this.editingPlayNoteId.set(play.id);
+    this.editingPlayNoteValue.set(play.notes ?? '');
+  }
+
+  cancelEditPlayNote(): void {
+    this.editingPlayNoteId.set(null);
+    this.editingPlayNoteValue.set('');
+  }
+
+  // Saved immediately via PATCH rather than batched with the rest of the form —
+  // notes belong to the play record itself, not the draft Game, so there's nothing
+  // to lose by writing them right away (unlike removePlay, which only takes effect
+  // once you hit Save, since undoing a play is destructive and worth a final chance
+  // to back out of via Cancel).
+  savePlayNote(play: GamePlay): void {
+    const id = this.editId();
+    if (id == null) return;
+    const notes = this.editingPlayNoteValue().trim() || null;
+    this.savingPlayNote.set(true);
+    this.api.updatePlayNotes(id, play.id, notes).subscribe({
+      next: (updated) => {
+        this.playHistory.update(list => list.map(p => p.id === updated.id ? updated : p));
+        this.editingPlayNoteId.set(null);
+        this.editingPlayNoteValue.set('');
+        this.savingPlayNote.set(false);
+      },
+      error: (err) => {
+        this.formError.set(describeHttpError(err));
+        this.savingPlayNote.set(false);
+      }
+    });
   }
 
   readonly formatDate = formatDate;

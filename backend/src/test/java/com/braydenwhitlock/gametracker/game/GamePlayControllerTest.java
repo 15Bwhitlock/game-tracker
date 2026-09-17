@@ -32,7 +32,7 @@ class GamePlayControllerTest {
     @Test
     void logPlayWithEmptyBodyUsesToday() throws Exception {
         Game g = sampleGame(1L);
-        when(gameService.logPlay(eq(1L), any(LocalDate.class)))
+        when(gameService.logPlay(eq(1L), any(LocalDate.class), eq(null)))
                 .thenReturn(new LogPlayResponse(g, 42L));
 
         mvc.perform(post("/api/games/1/plays")
@@ -47,7 +47,7 @@ class GamePlayControllerTest {
     void logPlayWithSpecificDatePassesThatDate() throws Exception {
         LocalDate date = LocalDate.of(2026, 3, 15);
         Game g = sampleGame(1L);
-        when(gameService.logPlay(1L, date)).thenReturn(new LogPlayResponse(g, 7L));
+        when(gameService.logPlay(1L, date, null)).thenReturn(new LogPlayResponse(g, 7L));
 
         mvc.perform(post("/api/games/1/plays")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -59,12 +59,40 @@ class GamePlayControllerTest {
     @Test
     void logPlayWithNoBodyDefaultsToToday() throws Exception {
         Game g = sampleGame(1L);
-        when(gameService.logPlay(eq(1L), any(LocalDate.class)))
+        when(gameService.logPlay(eq(1L), any(LocalDate.class), eq(null)))
                 .thenReturn(new LogPlayResponse(g, 10L));
 
         mvc.perform(post("/api/games/1/plays"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.game.id").value(1));
+    }
+
+    @Test
+    void logPlayWithNotesPassesThemThrough() throws Exception {
+        LocalDate date = LocalDate.of(2026, 3, 15);
+        Game g = sampleGame(1L);
+        when(gameService.logPlay(1L, date, "Taught two new players")).thenReturn(new LogPlayResponse(g, 8L));
+
+        mvc.perform(post("/api/games/1/plays")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(Map.of("playedAt", "2026-03-15", "notes", "Taught two new players"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.playId").value(8));
+    }
+
+    // --- PATCH /api/games/{gameId}/plays/{playId} ---
+
+    @Test
+    void updateNotesSetsNotesOnThePlay() throws Exception {
+        GamePlay updated = new GamePlay(1L, LocalDate.of(2026, 3, 15), "Great game");
+        ReflectionTestUtils.setField(updated, "id", 5L);
+        when(gameService.updatePlayNotes(1L, 5L, "Great game")).thenReturn(updated);
+
+        mvc.perform(patch("/api/games/1/plays/5")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(Map.of("notes", "Great game"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notes").value("Great game"));
     }
 
     // --- DELETE /api/games/{gameId}/plays/{playId} ---

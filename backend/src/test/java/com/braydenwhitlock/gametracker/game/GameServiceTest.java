@@ -149,7 +149,7 @@ class GameServiceTest {
         when(playRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         LocalDate date = LocalDate.of(2026, 5, 1);
-        service.logPlay(1L, date);
+        service.logPlay(1L, date, null);
 
         verify(playRepo).save(argThat(p -> p.getGameId().equals(1L) && p.getPlayedAt().equals(date)));
         verify(em).flush();
@@ -165,7 +165,7 @@ class GameServiceTest {
         when(gameRepo.findById(1L)).thenReturn(Optional.of(g));
         when(playRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
-        service.logPlay(1L, LocalDate.of(2026, 3, 1)); // earlier than existing
+        service.logPlay(1L, LocalDate.of(2026, 3, 1), null); // earlier than existing
 
         assertThat(g.getLastPlayedAt()).isEqualTo(LocalDate.of(2026, 5, 10));
     }
@@ -179,7 +179,7 @@ class GameServiceTest {
         when(playRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         LocalDate date = LocalDate.of(2026, 1, 15);
-        service.logPlay(1L, date);
+        service.logPlay(1L, date, null);
 
         assertThat(g.getLastPlayedAt()).isEqualTo(date);
     }

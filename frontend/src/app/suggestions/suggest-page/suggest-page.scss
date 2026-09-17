@@ -533,6 +533,11 @@
   gap: 0.2rem;
 }
 
+.play-history__notes {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .show-more {
   display: flex;
   justify-content: center;

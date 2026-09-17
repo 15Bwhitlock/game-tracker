@@ -320,6 +320,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Bulk actions in the Collection page — multi-select checkboxes (list and grid view) plus a "select all visible" checkbox; bulk-add a category/mechanic tag or bulk-delete every selected game
   - [x] Suggest page grid view — same list/grid toggle as Collection, own `suggestViewMode` localStorage key, list stays the default
   - [x] Dictionary → Collection link — every category/mechanic name in the Dictionary links to `/collection?search=<name>`, reusing Collection's existing search-param handling
+  - [x] Notes per play session — `game_plays.notes` (V13 migration), settable when logging a play or afterward via `PATCH /api/games/{id}/plays/{playId}`; edited inline in the edit form's play history, shown read-only in both detail modals
 
 ---
 
@@ -331,6 +332,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-16** — **Notes per play session.** Seventh of the "do it all" batch — play history previously recorded only a date. Added a nullable `notes` column to `game_plays` (V13 migration), a `GamePlay.notes` field, an optional `notes` on the existing `POST /plays` request body, and a new `PATCH /api/games/{id}/plays/{playId}` endpoint for setting or clearing a note after the fact. Deliberately kept the quick "Log play" button on Collection/Suggest frictionless (still a single click, no dialog) — notes are added afterward via the edit form's play history list, where each entry gets a 📝 button that reveals an inline textarea, saved immediately via PATCH (unlike removing a play, which stays pending until the whole form is saved, since deleting a play is destructive and worth a last chance to back out of via Cancel — a note is not). Collection's and Suggest's read-only detail-modal play history lists now show the note inline (`— <note>`) next to the date when one exists. 72 backend + 78 e2e tests pass.
 
 - **2026-09-16** — **Dictionary → Collection link.** Sixth of the "do it all" batch. Every category and mechanic name in the Dictionary page's Categories/Mechanics sections is now a link to `/collection?search=<name>` — Collection already reads and applies a `search` query param on load (the same mechanism the game-form's "back to collection" flow uses), so no new filtering logic was needed on either side, just a `routerLink` + `queryParams` on each entry name. Deliberately left the Glossary and reference-scale sections (Complexity, Player Count, Play Time, Rating) as plain text — those aren't real per-game tags the Collection search can match on, so a link there would look clickable but do nothing useful. New e2e tests seed a game with a known category/mechanic, click the Dictionary entry, and confirm both the URL and that the seeded game appears in the filtered Collection results. 70 backend + 77 e2e tests pass.
 

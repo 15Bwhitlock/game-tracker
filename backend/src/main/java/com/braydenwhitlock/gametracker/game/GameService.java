@@ -117,10 +117,10 @@ public class GameService {
         return gameRepository.save(game);
     }
 
-    public LogPlayResponse logPlay(Long gameId, LocalDate playedAt) {
+    public LogPlayResponse logPlay(Long gameId, LocalDate playedAt, String notes) {
         Game game = findById(gameId);
         // Insert a new row in game_plays to record this session.
-        GamePlay play = playRepository.save(new GamePlay(gameId, playedAt));
+        GamePlay play = playRepository.save(new GamePlay(gameId, playedAt, notes));
         // Keep lastPlayedAt as the most recent date across all plays, so the
         // variety-scoring logic in SuggestionService always has a fresh value.
         if (game.getLastPlayedAt() == null || playedAt.isAfter(game.getLastPlayedAt())) {
@@ -131,6 +131,16 @@ public class GameService {
         entityManager.flush();
         entityManager.refresh(game);
         return new LogPlayResponse(game, play.getId());
+    }
+
+    public GamePlay updatePlayNotes(Long gameId, Long playId, String notes) {
+        // Same ownership check as undoPlay — prevents one game's playId from
+        // accidentally editing a play that belongs to a different game.
+        GamePlay play = playRepository.findById(playId)
+                .filter(p -> p.getGameId().equals(gameId))
+                .orElseThrow(() -> new GameNotFoundException(gameId));
+        play.setNotes(notes);
+        return playRepository.save(play);
     }
 
     public Game undoPlay(Long gameId, Long playId) {

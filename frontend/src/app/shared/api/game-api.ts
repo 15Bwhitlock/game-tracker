@@ -9,6 +9,7 @@ export interface GamePlay {
   id: number;
   gameId: number;
   playedAt: string; // ISO date string, e.g. "2025-05-07"
+  notes: string | null;
 }
 
 // Returned by logPlay — bundles the refreshed game (with updated playCount)
@@ -81,6 +82,11 @@ export class GameApi {
   // Fetch the full play history for a game, newest first.
   getPlays(id: number): Observable<GamePlay[]> {
     return this.http.get<GamePlay[]>(`${this.baseUrl}/${id}/plays`);
+  }
+
+  // Set (or clear, with null) the notes on an already-logged play.
+  updatePlayNotes(gameId: number, playId: number, notes: string | null): Observable<GamePlay> {
+    return this.http.patch<GamePlay>(`${this.baseUrl}/${gameId}/plays/${playId}`, { notes });
   }
 
   // Set (or clear) the series name on an already-saved game.
