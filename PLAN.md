@@ -319,6 +319,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Export/backup — "Export" button on the Collection page downloads the whole collection as a timestamped JSON file, client-side, no new endpoint
   - [x] Bulk actions in the Collection page — multi-select checkboxes (list and grid view) plus a "select all visible" checkbox; bulk-add a category/mechanic tag or bulk-delete every selected game
   - [x] Suggest page grid view — same list/grid toggle as Collection, own `suggestViewMode` localStorage key, list stays the default
+  - [x] Dictionary → Collection link — every category/mechanic name in the Dictionary links to `/collection?search=<name>`, reusing Collection's existing search-param handling
 
 ---
 
@@ -330,6 +331,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-16** — **Dictionary → Collection link.** Sixth of the "do it all" batch. Every category and mechanic name in the Dictionary page's Categories/Mechanics sections is now a link to `/collection?search=<name>` — Collection already reads and applies a `search` query param on load (the same mechanism the game-form's "back to collection" flow uses), so no new filtering logic was needed on either side, just a `routerLink` + `queryParams` on each entry name. Deliberately left the Glossary and reference-scale sections (Complexity, Player Count, Play Time, Rating) as plain text — those aren't real per-game tags the Collection search can match on, so a link there would look clickable but do nothing useful. New e2e tests seed a game with a known category/mechanic, click the Dictionary entry, and confirm both the URL and that the seeded game appears in the filtered Collection results. 70 backend + 77 e2e tests pass.
 
 - **2026-09-16** — **Suggest page grid view.** Fifth of the "do it all" batch — the same list/grid toggle the Collection page got, applied to suggestion results, since a session's worth of possible games benefits from seeing cover art just as much as the collection does. New `.suggest-tile` cards mirror Collection's `.grid-tile` (cover image, rank badge, score badge, brief meta, reasons, Log Play), toggled via the same view-toggle button pair placed next to the "Results" heading. Persisted under its own `suggestViewMode` localStorage key rather than sharing Collection's `collectionViewMode` — list stays the *default* here (unlike Collection's grid default) since existing users' muscle memory and every existing e2e test already assume list-first results, and there was no request to change that default, only to add the option. New e2e test toggles to grid, confirms `.suggest-tile` replaces `<li class="suggestion">`, then reloads and re-runs the same search to confirm the preference (not just in-memory state) carried over — a suggestion search itself isn't persisted across a reload, so the test re-submits it rather than expecting stale results to reappear. 70 backend + 75 e2e tests pass.
 

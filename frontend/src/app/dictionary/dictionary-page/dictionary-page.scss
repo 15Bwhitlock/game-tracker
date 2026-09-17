@@ -98,6 +98,14 @@
   color: var(--text-primary);
 }
 
+.entry__name--link {
+  color: var(--accent-text);
+  text-decoration: none;
+  cursor: pointer;
+
+  &:hover { text-decoration: underline; }
+}
+
 .entry__desc {
   font-size: 0.88rem;
   color: var(--text-secondary);

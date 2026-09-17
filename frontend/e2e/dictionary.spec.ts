@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { seedGame, deleteGame, e2eTitle } from './support/api';
 
 test.describe('Dictionary page', () => {
   test('lists reference sections by default', async ({ page }) => {
@@ -33,5 +34,35 @@ test.describe('Dictionary page', () => {
     // text is actually searched, not just the term/category/mechanic name.
     await search.fill('perfect information');
     await expect(page.locator('.entry__name', { hasText: 'Abstract' })).toBeVisible();
+  });
+
+  test('clicking a category name jumps to the Collection page filtered to it', async ({ page, request }) => {
+    const title = e2eTitle('dictionary link category');
+    const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2, categories: ['Strategy'] });
+
+    try {
+      await page.goto('/dictionary');
+      await page.locator('.entry__name--link', { hasText: 'Strategy' }).first().click();
+
+      await expect(page).toHaveURL(/\/collection\?search=Strategy/);
+      await expect(page.getByRole('button', { name: title })).toBeVisible();
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+
+  test('clicking a mechanic name jumps to the Collection page filtered to it', async ({ page, request }) => {
+    const title = e2eTitle('dictionary link mechanic');
+    const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2, mechanics: ['Hand Management'] });
+
+    try {
+      await page.goto('/dictionary');
+      await page.locator('.entry__name--link', { hasText: 'Hand Management' }).first().click();
+
+      await expect(page).toHaveURL(/\/collection\?search=Hand(%20|\+)Management/);
+      await expect(page.getByRole('button', { name: title })).toBeVisible();
+    } finally {
+      await deleteGame(request, id);
+    }
   });
 });
