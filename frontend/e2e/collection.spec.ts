@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { seedGame, deleteGame, e2eTitle } from './support/api';
 
 test.describe('Collection page', () => {
@@ -184,6 +185,23 @@ test.describe('Collection page', () => {
 
     await expect(page).toHaveURL(/\/collection\?search=/);
     await expect(page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…')).toHaveValue(title);
+  });
+
+  test('Export downloads the whole collection as JSON, including this seeded game', async ({ page }) => {
+    await page.goto('/collection');
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export' }).click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/^game-tracker-export-\d{4}-\d{2}-\d{2}\.json$/);
+    const path = await download.path();
+    const contents = JSON.parse(await readFile(path!, 'utf-8'));
+    expect(Array.isArray(contents)).toBe(true);
+    expect(contents.some((g: { id: number }) => g.id === gameId)).toBe(true);
+    const exportedGame = contents.find((g: { id: number }) => g.id === gameId);
+    expect(exportedGame.title).toBe(title);
+    expect(exportedGame.notes).toBe('A note only this seeded game should have.');
   });
 });
 

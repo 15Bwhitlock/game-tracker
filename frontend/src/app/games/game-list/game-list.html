@@ -5,6 +5,13 @@
       <button type="button" class="btn btn--ghost" (click)="refresh()" [disabled]="loading()">
         Refresh
       </button>
+      <button
+        type="button"
+        class="btn btn--ghost"
+        (click)="exportCollection()"
+        [disabled]="loading() || games().length === 0"
+        title="Download your whole collection as a JSON file"
+      >Export</button>
       <a routerLink="/games/add" class="btn btn--primary">Add game</a>
     </div>
   </header>
