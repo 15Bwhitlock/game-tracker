@@ -1,5 +1,6 @@
 import { Component, computed, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 
 import { GAME_CATEGORIES, GAME_MECHANICS } from '@shared/models';
 
@@ -33,7 +34,7 @@ export interface RatingTip {
 
 @Component({
   selector: 'app-dictionary-page',
-  imports: [FormsModule],
+  imports: [FormsModule, RouterLink],
   templateUrl: './dictionary-page.html',
   styleUrl: './dictionary-page.scss'
 })

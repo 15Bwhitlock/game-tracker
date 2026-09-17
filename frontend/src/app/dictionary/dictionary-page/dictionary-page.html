@@ -108,7 +108,12 @@
       <div class="entry-list">
         @for (cat of filteredCategories(); track cat.name) {
           <div class="entry">
-            <span class="entry__name">{{ cat.name }}</span>
+            <a
+              class="entry__name entry__name--link"
+              [routerLink]="['/collection']"
+              [queryParams]="{ search: cat.name }"
+              title="View games in your collection tagged with this category"
+            >{{ cat.name }}</a>
             <span class="entry__desc">{{ cat.description }}</span>
           </div>
         }
@@ -126,7 +131,12 @@
       <div class="entry-list">
         @for (m of filteredMechanics(); track m.name) {
           <div class="entry">
-            <span class="entry__name">{{ m.name }}</span>
+            <a
+              class="entry__name entry__name--link"
+              [routerLink]="['/collection']"
+              [queryParams]="{ search: m.name }"
+              title="View games in your collection tagged with this mechanic"
+            >{{ m.name }}</a>
             <span class="entry__desc">{{ m.description }}</span>
           </div>
         }
