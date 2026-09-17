@@ -334,13 +334,15 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Open questions
-- Hosting — local only, or eventually deploy somewhere (Fly.io, Render, a home server)? **If yes: BGG's terms require a "Powered by BGG" logo linking back to BGG on any "public facing" application using their XML API — not needed while this stays local/personal, but add it before hosting somewhere others can reach.**
+- Hosting — local only, or eventually deploy somewhere (Fly.io, Render, a home server)? A "Powered by BoardGameGeek" attribution link is already added (app-wide footer, see 2026-09-17 decision log entry) ahead of that, so this is no longer a blocker either way.
 - Mobile-friendly UI a priority, or desktop-first is fine?
 - Multiple physical locations / shelves to track, or just one library?
 
 ---
 
 ## Decisions log
+
+- **2026-09-17** — **"Powered by BoardGameGeek" attribution footer.** BGG's XML API terms require attribution linking back to BGG on any public-facing app using it — previously deferred (Open questions) since the app was local-only. Added proactively, ahead of ever actually hosting it publicly: a small text link ("Powered by BoardGameGeek" → `boardgamegeek.com`) in a new app-wide footer in `app.html`/`app.scss`, visible on every page. Kept it as a plain text link rather than BGG's official logo asset, since the exact current logo/asset URL couldn't be verified live (BGG's terms and wiki pages return 403 to automated fetches) — a text link satisfies the "linking back to BGG" requirement without depending on an unverified asset. New e2e test checks the link is present and correctly targeted on the collection, suggest, and dictionary pages.
 
 - **2026-09-17** — **GitHub Actions CI.** Last of the "do it all" batch. `.github/workflows/ci.yml` runs on every push/PR to `main` as two jobs: `backend-tests` (`./mvnw test` — never touches the frontend, since `frontend-maven-plugin` is bound to the later `prepare-package` phase; `GameRepositoryTest`'s Testcontainers Postgres comes straight from the runner's preinstalled Docker, no service container needed) and `e2e-tests` (a `postgres:15` service container matching `docker-compose.yml`'s credentials, the backend started with `./mvnw spring-boot:run` in the background — the same command PLAN.md already tells a human to run, and it skips the Angular build — then `npx playwright test`, which starts the Angular dev server itself via `playwright.config.ts`'s existing `webServer` option once `CI=true`). Deliberately configured no `BGG_API_TOKEN` secret: every e2e test that needs a real BGG lookup already self-skips when BGG returns nothing (`test.skip(hits.length === 0, ...)`, added back when the token requirement first landed) — this workflow would rather run those as a documented skip than hand a real secret to CI for a single-user personal project. Added a CI status badge to the README. This is the last of the 8 improvements from the 2026-09-16 "what else can you improve?" / "do it all" batch.
 

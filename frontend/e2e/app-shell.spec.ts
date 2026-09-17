@@ -43,6 +43,17 @@ test.describe('App shell', () => {
     await expect(page).toHaveURL(/\/collection/);
   });
 
+  test('shows a BGG attribution link in the footer on every page', async ({ page }) => {
+    // BGG's XML API terms require attribution linking back to them on any
+    // public-facing app that uses it — see PLAN.md's Open questions.
+    for (const path of ['/collection', '/suggest', '/dictionary']) {
+      await page.goto(path);
+      const attribution = page.getByRole('link', { name: 'Powered by BoardGameGeek' });
+      await expect(attribution).toBeVisible();
+      await expect(attribution).toHaveAttribute('href', 'https://boardgamegeek.com');
+    }
+  });
+
   test('an unknown URL renders the 404 page instead of a blank one', async ({ page }) => {
     await page.goto('/this-page-does-not-exist');
     await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
