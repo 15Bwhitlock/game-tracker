@@ -63,7 +63,7 @@ export class SuggestPage implements OnInit {
   // grid there) reflects what suits each page's content, not a single shared choice.
   private static readonly VIEW_MODE_KEY = 'suggestViewMode';
   readonly viewMode = signal<'list' | 'grid'>(
-    (localStorage.getItem(SuggestPage.VIEW_MODE_KEY) as 'list' | 'grid' | null) ?? 'list'
+    (localStorage.getItem(SuggestPage.VIEW_MODE_KEY) as 'list' | 'grid' | null) ?? 'grid'
   );
 
   setViewMode(mode: 'list' | 'grid'): void {
