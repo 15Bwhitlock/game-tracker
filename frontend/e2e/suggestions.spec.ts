@@ -378,4 +378,38 @@ test.describe('Suggestions page', () => {
       await deleteGame(request, otherId);
     }
   });
+
+  test('switching to grid view shows results as tiles and remembers the choice on reload', async ({ page, request }) => {
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const title = e2eTitle('grid view result');
+    const id = await seedGame(request, {
+      title, minPlayers: 2, maxPlayers: 2, categories: [category]
+    });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+      await page.getByRole('button', { name: category, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+
+      // List view is the default — the result renders as an <li class="suggestion">.
+      await expect(page.locator('li.suggestion', { hasText: title })).toBeVisible();
+      await expect(page.locator('.suggest-tile')).toHaveCount(0);
+
+      await page.getByRole('group', { name: 'Results view mode' }).getByTitle('Grid view').click();
+      await expect(page.locator('.suggest-tile', { hasText: title })).toBeVisible();
+      await expect(page.locator('li.suggestion')).toHaveCount(0);
+
+      // The choice is a persisted preference (localStorage), not just in-memory component
+      // state — a full reload clears the search itself, so re-run it and confirm grid is
+      // still the active view rather than having silently reverted to list.
+      await page.reload();
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+      await page.getByRole('button', { name: category, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+      await expect(page.locator('.suggest-tile', { hasText: title })).toBeVisible();
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
 });
