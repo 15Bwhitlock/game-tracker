@@ -2,6 +2,13 @@ import { test, expect } from '@playwright/test';
 import { seedGame, deleteGame, e2eTitle } from './support/api';
 
 test.describe('Suggestions page', () => {
+  // These tests assert against list-view markup (<li class="suggestion">), so force
+  // list view regardless of the grid default — the view-toggle test below is what
+  // actually tests grid view and the default itself, and sets its own initial state.
+  test.beforeEach(async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('suggestViewMode', 'list'));
+  });
+
   test('renders the criteria form with presets and button groups', async ({ page }) => {
     await page.goto('/suggest');
     await expect(page.getByRole('heading', { name: 'What should we play?' })).toBeVisible();
@@ -378,8 +385,14 @@ test.describe('Suggestions page', () => {
       await deleteGame(request, otherId);
     }
   });
+});
 
-  test('switching to grid view shows results as tiles and remembers the choice on reload', async ({ page, request }) => {
+// Separate describe block, deliberately outside the main one's list-view-forcing
+// beforeEach — this test is specifically about the real default and the toggle, so
+// it needs each test's naturally fresh, empty-localStorage browser context, not that
+// override.
+test.describe('Suggestions page view toggle', () => {
+  test('defaults to grid view, and remembers a switch to list across reloads', async ({ page, request }) => {
     const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
     const title = e2eTitle('grid view result');
     const id = await seedGame(request, {
@@ -392,22 +405,22 @@ test.describe('Suggestions page', () => {
       await page.getByRole('button', { name: category, exact: true }).click();
       await page.getByRole('button', { name: 'Suggest' }).click();
 
-      // List view is the default — the result renders as an <li class="suggestion">.
-      await expect(page.locator('li.suggestion', { hasText: title })).toBeVisible();
-      await expect(page.locator('.suggest-tile')).toHaveCount(0);
-
-      await page.getByRole('group', { name: 'Results view mode' }).getByTitle('Grid view').click();
+      // Grid is the default — the result renders as a .suggest-tile, not an <li>.
       await expect(page.locator('.suggest-tile', { hasText: title })).toBeVisible();
       await expect(page.locator('li.suggestion')).toHaveCount(0);
 
+      await page.getByRole('group', { name: 'Results view mode' }).getByTitle('List view').click();
+      await expect(page.locator('li.suggestion', { hasText: title })).toBeVisible();
+      await expect(page.locator('.suggest-tile')).toHaveCount(0);
+
       // The choice is a persisted preference (localStorage), not just in-memory component
-      // state — a full reload clears the search itself, so re-run it and confirm grid is
-      // still the active view rather than having silently reverted to list.
+      // state — a full reload clears the search itself, so re-run it and confirm list is
+      // still the active view rather than having silently reverted to grid.
       await page.reload();
       await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
       await page.getByRole('button', { name: category, exact: true }).click();
       await page.getByRole('button', { name: 'Suggest' }).click();
-      await expect(page.locator('.suggest-tile', { hasText: title })).toBeVisible();
+      await expect(page.locator('li.suggestion', { hasText: title })).toBeVisible();
     } finally {
       await deleteGame(request, id);
     }
