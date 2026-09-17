@@ -420,6 +420,37 @@ test.describe('Add / edit game form', () => {
     await deleteGame(request, id);
   });
 
+  test('edit mode lets you add and edit a note on a logged play', async ({ page, request }) => {
+    const title = e2eTitle('play notes');
+    const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2 });
+    const playResponse = await request.post(`/api/games/${id}/plays`, { data: {} });
+    const { playId } = await playResponse.json();
+
+    await page.goto(`/games/${id}/edit`);
+    const historyItem = page.locator('.play-history-item').first();
+    await expect(historyItem).toBeVisible();
+    await expect(historyItem).not.toContainText('Taught two new players');
+
+    await historyItem.getByTitle('Add a note').click();
+    await historyItem.locator('textarea').fill('Taught two new players');
+    await historyItem.getByRole('button', { name: 'Save' }).click();
+
+    await expect(historyItem).toContainText('Taught two new players');
+
+    // Persisted server-side, not just in the local signal.
+    const plays = await (await request.get(`/api/games/${id}/plays`)).json();
+    expect(plays.find((p: { id: number }) => p.id === playId).notes).toBe('Taught two new players');
+
+    // Editing an existing note updates it in place.
+    await historyItem.getByTitle('Edit note').click();
+    await historyItem.locator('textarea').fill('Actually taught three new players');
+    await historyItem.getByRole('button', { name: 'Save' }).click();
+    await expect(historyItem).toContainText('Actually taught three new players');
+    await expect(historyItem).not.toContainText('Taught two new players');
+
+    await deleteGame(request, id);
+  });
+
   test('editing an existing game updates it', async ({ page, request }) => {
     const title = e2eTitle('edit flow');
     const id = await seedGame(request, { title, minPlayers: 2, maxPlayers: 2 });

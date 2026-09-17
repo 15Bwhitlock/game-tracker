@@ -347,22 +347,49 @@
               <ul class="play-history-list">
                 @for (entry of visiblePlayHistory(); track entry.play.id) {
                   <li class="play-history-item" [class.play-history-item--pending]="entry.pending">
-                    <span>{{ formatDate(entry.play.playedAt) }}</span>
-                    @if (entry.pending) {
-                      <span class="play-history-item__label">removed on save</span>
-                      <button
-                        type="button"
-                        class="btn--icon"
-                        title="Restore this play"
-                        (click)="restorePlay(entry.play)"
-                      >↩</button>
-                    } @else {
-                      <button
-                        type="button"
-                        class="btn--icon btn--icon-danger"
-                        title="Remove this play"
-                        (click)="removePlay(entry.play)"
-                      >✕</button>
+                    <div class="play-history-item__row">
+                      <span>{{ formatDate(entry.play.playedAt) }}</span>
+                      @if (entry.pending) {
+                        <span class="play-history-item__label">removed on save</span>
+                        <button
+                          type="button"
+                          class="btn--icon"
+                          title="Restore this play"
+                          (click)="restorePlay(entry.play)"
+                        >↩</button>
+                      } @else {
+                        <button
+                          type="button"
+                          class="btn--icon"
+                          [title]="entry.play.notes ? 'Edit note' : 'Add a note'"
+                          (click)="startEditPlayNote(entry.play)"
+                        >{{ entry.play.notes ? '📝' : '➕📝' }}</button>
+                        <button
+                          type="button"
+                          class="btn--icon btn--icon-danger"
+                          title="Remove this play"
+                          (click)="removePlay(entry.play)"
+                        >✕</button>
+                      }
+                    </div>
+                    @if (editingPlayNoteId() === entry.play.id) {
+                      <div class="play-history-item__note-edit">
+                        <textarea
+                          rows="2"
+                          placeholder="e.g. taught two new players, played the expansion…"
+                          [ngModel]="editingPlayNoteValue()"
+                          (ngModelChange)="editingPlayNoteValue.set($event)"
+                          [ngModelOptions]="{ standalone: true }"
+                        ></textarea>
+                        <div class="play-history-item__note-actions">
+                          <button type="button" class="btn btn--ghost btn--sm" [disabled]="savingPlayNote()" (click)="cancelEditPlayNote()">Cancel</button>
+                          <button type="button" class="btn btn--primary btn--sm" [disabled]="savingPlayNote()" (click)="savePlayNote(entry.play)">
+                            {{ savingPlayNote() ? 'Saving…' : 'Save' }}
+                          </button>
+                        </div>
+                      </div>
+                    } @else if (entry.play.notes) {
+                      <p class="play-history-item__notes">{{ entry.play.notes }}</p>
                     }
                   </li>
                 }

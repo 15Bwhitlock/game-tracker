@@ -425,7 +425,12 @@
           } @else {
             <ol class="play-history">
               @for (play of playHistory(); track play.id) {
-                <li>{{ formatDate(play.playedAt) }}</li>
+                <li>
+                  {{ formatDate(play.playedAt) }}
+                  @if (play.notes) {
+                    <span class="play-history__notes">— {{ play.notes }}</span>
+                  }
+                </li>
               }
             </ol>
           }

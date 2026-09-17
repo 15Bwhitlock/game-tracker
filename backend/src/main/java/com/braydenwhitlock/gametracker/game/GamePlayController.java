@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -32,18 +33,28 @@ public class GamePlayController {
         this.playRepository = playRepository;
     }
 
-    @Operation(summary = "Log a play", description = "Defaults to today's date if playedAt is omitted")
+    @Operation(summary = "Log a play", description = "Defaults to today's date if playedAt is omitted; notes are optional")
     // POST /api/games/{gameId}/plays — records a new play session.
-    // The body is optional: if you send { "playedAt": "2025-05-01" } the play
-    // is recorded on that date; if the body is absent or playedAt is null,
-    // today's date is used (the common case — you just finished playing).
+    // The body is optional: if you send { "playedAt": "2025-05-01", "notes": "..." }
+    // the play is recorded on that date with those notes; if the body is absent or
+    // playedAt is null, today's date is used (the common case — you just finished playing).
     // Returns the updated Game (with new playCount) plus the new play's ID
     // (so the UI can undo it if needed).
     @PostMapping
     public LogPlayResponse logPlay(@PathVariable Long gameId,
                                    @RequestBody(required = false) LogPlayRequest body) {
         LocalDate date = (body != null && body.playedAt() != null) ? body.playedAt() : LocalDate.now();
-        return gameService.logPlay(gameId, date);
+        String notes = body != null ? body.notes() : null;
+        return gameService.logPlay(gameId, date, notes);
+    }
+
+    @Operation(summary = "Set or clear a play's notes")
+    // PATCH /api/games/{gameId}/plays/{playId} — updates just the notes on an
+    // already-logged play, for adding a note after the fact (or clearing one).
+    @PatchMapping("/{playId}")
+    public GamePlay updateNotes(@PathVariable Long gameId, @PathVariable Long playId,
+                                 @RequestBody UpdatePlayNotesRequest body) {
+        return gameService.updatePlayNotes(gameId, playId, body.notes());
     }
 
     @Operation(summary = "Undo a logged play")
@@ -68,5 +79,7 @@ public class GamePlayController {
 
     // The request body for logging a play. A Java record is concise for a
     // small DTO like this — Jackson deserializes it automatically.
-    record LogPlayRequest(LocalDate playedAt) {}
+    record LogPlayRequest(LocalDate playedAt, String notes) {}
+
+    record UpdatePlayNotesRequest(String notes) {}
 }

@@ -39,12 +39,23 @@ public class GamePlay {
     @Column(name = "played_at", nullable = false)
     private LocalDate playedAt;
 
+    // Optional per-play notes (e.g. "played the Seafarers expansion"). TEXT rather
+    // than VARCHAR(255) — same reasoning as Game.notes, can be arbitrarily long.
+    @Column(columnDefinition = "TEXT")
+    private String notes;
+
     // JPA requires a no-arg constructor.
     public GamePlay() {}
 
     public GamePlay(Long gameId, LocalDate playedAt) {
         this.gameId = gameId;
         this.playedAt = playedAt;
+    }
+
+    public GamePlay(Long gameId, LocalDate playedAt, String notes) {
+        this.gameId = gameId;
+        this.playedAt = playedAt;
+        this.notes = notes;
     }
 
     public Long getId() { return id; }
@@ -54,4 +65,7 @@ public class GamePlay {
 
     public LocalDate getPlayedAt() { return playedAt; }
     public void setPlayedAt(LocalDate playedAt) { this.playedAt = playedAt; }
+
+    public String getNotes() { return notes; }
+    public void setNotes(String notes) { this.notes = notes; }
 }

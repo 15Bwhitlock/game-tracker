@@ -561,6 +561,11 @@
   gap: 0.2rem;
 }
 
+.play-history__notes {
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
 .delete-confirm__message {
   font-size: 0.95rem;
   color: var(--text-body);
