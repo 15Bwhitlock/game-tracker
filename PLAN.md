@@ -317,6 +317,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Production build — `frontend-maven-plugin` builds Angular and copies dist into Spring Boot `static/`; `WebConfig` forwards unknown routes to `index.html` for Angular router
   - [x] "Refresh from BGG" button on the edit form for already-linked games — re-fetches and re-applies BGG data (title/players/time/complexity/categories/mechanics/images/year/best-player-counts/notes) without a fresh search; shares the same apply/confirm/Undo machinery as the add-form import
   - [x] Export/backup — "Export" button on the Collection page downloads the whole collection as a timestamped JSON file, client-side, no new endpoint
+  - [x] Bulk actions in the Collection page — multi-select checkboxes (list and grid view) plus a "select all visible" checkbox; bulk-add a category/mechanic tag or bulk-delete every selected game
 
 ---
 
@@ -328,6 +329,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-16** — **Bulk actions in the Collection page (multi-select, bulk-delete, bulk-tag).** Fourth of the "do it all" batch. Added a checkbox to every row/tile (a new leftmost `<th>`/`<td>` in list view, an absolutely-positioned overlay in grid view) plus a "select all visible" checkbox in the table header — selection is a plain `Set<number>` of ids, not state on the `Game` objects themselves. A bulk-action bar appears once anything is selected: add one category or mechanic to every selected game at once (skipping games that already have it, via parallel `forkJoin` calls to the existing per-game `update()` endpoint — no new backend endpoint needed), or delete every selected game (its own confirmation dialog, separate from the single-game one). Caught a real regression while writing this: the new leftmost `<td>` shifted every column index by one, breaking two existing tests that located the Personal Rating cell by `td.nth(6)` — fixed both to `nth(7)` and left a comment naming the new column so the next index-based assertion doesn't repeat it. 70 backend + 74 e2e tests pass.
 
 - **2026-09-16** — **Export/backup.** Third of the "do it all" batch. Added an "Export" button to the Collection page header that downloads the entire collection (ignoring any active search/filter, so a backup never silently drops games) as a timestamped JSON file (`game-tracker-export-YYYY-MM-DD.json`) via a client-side `Blob` + `URL.createObjectURL` — no new backend endpoint needed since the full game list is already loaded client-side. JSON over CSV to keep array fields (categories, mechanics, bestPlayerCounts) faithful without a flattening scheme, so the file could plausibly be used as a real restore source later. New e2e test seeds a game, clicks Export, and asserts on the downloaded file's name and contents (via Playwright's `download` event + reading the saved file). 70 backend + 71 e2e tests pass.
 

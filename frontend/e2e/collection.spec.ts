@@ -34,8 +34,8 @@ test.describe('Collection page', () => {
     const row = page.locator('tr', { has: page.getByRole('button', { name: title }) });
     await expect(row).toBeVisible();
     await expect(row).toContainText('2–4');
-    // td order: Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
-    await expect(row.locator('td').nth(6)).toHaveText('8');
+    // td order: Select, Title, Players, Time, Complexity, Plays, Last Played, Personal Rating, actions.
+    await expect(row.locator('td').nth(7)).toHaveText('8');
   });
 
   test('search filters the table by title', async ({ page }) => {
@@ -433,6 +433,103 @@ test.describe('Collection page BGG filter', () => {
       await deleteGame(request, linkedId);
       await deleteGame(request, unlinkedId);
       await deleteGame(request, linkedLowId);
+    }
+  });
+});
+
+test.describe('Collection page bulk actions', () => {
+  test.beforeEach(async ({ page }) => {
+    // Bulk-select checkboxes exist in both views, but these tests assert against
+    // list-view <tr>/<td> markup, so force it regardless of the grid default.
+    await page.addInitScript(() => localStorage.setItem('collectionViewMode', 'list'));
+  });
+
+  test('selecting games shows the bulk bar, and bulk-delete removes all selected', async ({ page, request }) => {
+    const titleA = e2eTitle('bulk delete a');
+    const titleB = e2eTitle('bulk delete b');
+    const idA = await seedGame(request, { title: titleA, minPlayers: 2, maxPlayers: 2 });
+    const idB = await seedGame(request, { title: titleB, minPlayers: 2, maxPlayers: 2 });
+
+    try {
+      await page.goto('/collection');
+      const rowA = page.locator('tr', { has: page.getByRole('button', { name: titleA }) });
+      const rowB = page.locator('tr', { has: page.getByRole('button', { name: titleB }) });
+
+      await rowA.locator('input[type="checkbox"]').check();
+      await expect(page.locator('.bulk-bar')).toContainText('1 selected');
+
+      await rowB.locator('input[type="checkbox"]').check();
+      await expect(page.locator('.bulk-bar')).toContainText('2 selected');
+
+      await page.getByRole('button', { name: 'Delete selected' }).click();
+      await page.locator('dialog.modal', { hasText: 'Delete 2 games?' }).getByRole('button', { name: 'Delete' }).click();
+
+      await expect(page.getByRole('button', { name: titleA })).not.toBeVisible();
+      await expect(page.getByRole('button', { name: titleB })).not.toBeVisible();
+      await expect(page.locator('.bulk-bar')).not.toBeVisible();
+    } finally {
+      await deleteGame(request, idA);
+      await deleteGame(request, idB);
+    }
+  });
+
+  test('bulk-tag adds a category to every selected game', async ({ page, request }) => {
+    const tag = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const titleA = e2eTitle('bulk tag a');
+    const titleB = e2eTitle('bulk tag b');
+    const idA = await seedGame(request, { title: titleA, minPlayers: 2, maxPlayers: 2, categories: ['Strategy'] });
+    const idB = await seedGame(request, { title: titleB, minPlayers: 2, maxPlayers: 2 });
+
+    try {
+      await page.goto('/collection');
+      const rowA = page.locator('tr', { has: page.getByRole('button', { name: titleA }) });
+      const rowB = page.locator('tr', { has: page.getByRole('button', { name: titleB }) });
+
+      await rowA.locator('input[type="checkbox"]').check();
+      await rowB.locator('input[type="checkbox"]').check();
+
+      await page.locator('.bulk-bar__tag input').fill(tag);
+      await page.locator('.bulk-bar__tag button', { hasText: 'Add tag' }).click();
+
+      // Selection (and the bulk bar) stays open after tagging — only Clear/delete end it —
+      // but the input clears once the tag has been applied to every selected game.
+      await expect(page.locator('.bulk-bar__tag input')).toHaveValue('');
+
+      // Verify server-side rather than the table (categories aren't shown in list view).
+      const [gameA, gameB] = await Promise.all([
+        request.get(`/api/games/${idA}`).then(r => r.json()),
+        request.get(`/api/games/${idB}`).then(r => r.json()),
+      ]);
+      expect(gameA.categories).toContain(tag);
+      expect(gameA.categories).toContain('Strategy');
+      expect(gameB.categories).toContain(tag);
+    } finally {
+      await deleteGame(request, idA);
+      await deleteGame(request, idB);
+    }
+  });
+
+  test('select-all-visible checkbox selects and deselects every visible row', async ({ page, request }) => {
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const titleA = e2eTitle('select all a');
+    const titleB = e2eTitle('select all b');
+    const idA = await seedGame(request, { title: titleA, minPlayers: 2, maxPlayers: 2, categories: [category] });
+    const idB = await seedGame(request, { title: titleB, minPlayers: 2, maxPlayers: 2, categories: [category] });
+
+    try {
+      await page.goto('/collection');
+      const search = page.getByPlaceholder('Search title, categories, mechanics, notes, players, time, rating…');
+      await search.fill(category);
+
+      const headerCheckbox = page.locator('.th-select input[type="checkbox"]');
+      await headerCheckbox.check();
+      await expect(page.locator('.bulk-bar')).toContainText('2 selected');
+
+      await headerCheckbox.uncheck();
+      await expect(page.locator('.bulk-bar')).not.toBeVisible();
+    } finally {
+      await deleteGame(request, idA);
+      await deleteGame(request, idB);
     }
   });
 });

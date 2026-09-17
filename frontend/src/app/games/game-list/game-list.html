@@ -20,6 +20,32 @@
     <div class="alert alert--error" role="alert">{{ error() }}</div>
   }
 
+  @if (selectedCount() > 0) {
+    <div class="bulk-bar">
+      <span class="bulk-bar__count">{{ selectedCount() }} selected</span>
+      <div class="bulk-bar__tag">
+        <select [ngModel]="bulkTagType()" (ngModelChange)="bulkTagType.set($event)" [ngModelOptions]="{ standalone: true }">
+          <option value="category">Category</option>
+          <option value="mechanic">Mechanic</option>
+        </select>
+        <input
+          type="text"
+          placeholder="Add a tag to all selected…"
+          [ngModel]="bulkTagInput()"
+          (ngModelChange)="bulkTagInput.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+          (keydown.enter)="applyBulkTag()"
+        />
+        <button type="button" class="btn btn--ghost btn--sm" [disabled]="!bulkTagInput().trim()" (click)="applyBulkTag()">Add tag</button>
+      </div>
+      <button type="button" class="btn btn--danger btn--sm" (click)="confirmBulkDelete()">Delete selected</button>
+      <button type="button" class="btn btn--ghost btn--sm" (click)="clearSelection()">Clear</button>
+      @if (bulkActionError()) {
+        <span class="bulk-bar__error">{{ bulkActionError() }}</span>
+      }
+    </div>
+  }
+
   <div class="card">
     <div class="card__header">
       <h2>
@@ -149,6 +175,14 @@
       <div class="game-grid">
         @for (game of filteredGames(); track game.id) {
           <article class="grid-tile">
+            <input
+              type="checkbox"
+              class="grid-tile__select"
+              [attr.aria-label]="'Select ' + game.title"
+              [checked]="game.id != null && selectedIds().has(game.id)"
+              (change)="toggleSelect(game)"
+              (click)="$event.stopPropagation()"
+            />
             <button type="button" class="grid-tile__cover" (click)="openDetail(game)">
               @if (game.imageUrl || game.thumbnailUrl) {
                 <img [src]="game.imageUrl || game.thumbnailUrl" alt="" />
@@ -196,6 +230,14 @@
       <table class="table">
         <thead>
           <tr>
+            <th class="th-select">
+              <input
+                type="checkbox"
+                aria-label="Select all visible games"
+                [checked]="allVisibleSelected()"
+                (change)="toggleSelectAllVisible()"
+              />
+            </th>
             <th class="th-title"><span class="star-spacer" aria-hidden="true"></span>Title</th>
             <th>Players</th>
             <th>Average Game Time</th>
@@ -209,6 +251,14 @@
         <tbody>
           @for (game of filteredGames(); track game.id) {
             <tr>
+              <td class="select-cell">
+                <input
+                  type="checkbox"
+                  [attr.aria-label]="'Select ' + game.title"
+                  [checked]="game.id != null && selectedIds().has(game.id)"
+                  (change)="toggleSelect(game)"
+                />
+              </td>
               <td class="title-cell">
                 <button
                   type="button"
@@ -401,6 +451,22 @@
       <footer class="modal__footer">
         <button type="button" class="btn btn--ghost" (click)="cancelDelete()">Cancel</button>
         <button type="button" class="btn btn--danger" (click)="executeDelete()">Delete</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <dialog #bulkDeleteDialog class="modal">
+    <div class="modal__content">
+      <header class="modal__header">
+        <h2>Delete {{ selectedCount() }} games?</h2>
+        <button type="button" class="modal__close" aria-label="Close" (click)="cancelBulkDelete()">×</button>
+      </header>
+      <p class="delete-confirm__message">
+        Are you sure you want to delete these <strong>{{ selectedCount() }}</strong> games? This cannot be undone.
+      </p>
+      <footer class="modal__footer">
+        <button type="button" class="btn btn--ghost" (click)="cancelBulkDelete()">Cancel</button>
+        <button type="button" class="btn btn--danger" (click)="executeBulkDelete()">Delete</button>
       </footer>
     </div>
   </dialog>
