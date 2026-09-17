@@ -12,6 +12,7 @@ export interface Game {
   thumbnailUrl?: string | null;
   imageUrl?: string | null;
   yearPublished?: number | null;
+  bestPlayerCounts?: number[];
   ownedSince?: string | null;
   personalRating?: number | null;
   notes?: string | null;

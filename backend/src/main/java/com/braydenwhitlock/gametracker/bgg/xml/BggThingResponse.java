@@ -77,6 +77,10 @@ public class BggThingResponse {
         @JacksonXmlProperty(localName = "statistics")
         private Statistics statistics;
 
+        @JacksonXmlProperty(localName = "poll-summary")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        private List<PollSummary> pollSummaries = new ArrayList<>();
+
         public Integer getId() { return id; }
         public void setId(Integer id) { this.id = id; }
         public String getThumbnail() { return thumbnail; }
@@ -101,6 +105,45 @@ public class BggThingResponse {
         public void setLinks(List<Link> links) { this.links = links != null ? links : new ArrayList<>(); }
         public Statistics getStatistics() { return statistics; }
         public void setStatistics(Statistics statistics) { this.statistics = statistics; }
+        public List<PollSummary> getPollSummaries() { return pollSummaries; }
+        public void setPollSummaries(List<PollSummary> pollSummaries) { this.pollSummaries = pollSummaries != null ? pollSummaries : new ArrayList<>(); }
+    }
+
+    /**
+     * BGG's own precomputed summary of the "suggested number of players" poll — e.g. a
+     * result named "bestwith" with value {@code "Best with 4 players"} or
+     * {@code "Best with 2–4 players"}. Cheaper to parse than the raw per-count vote
+     * breakdown, since BGG has already done the "which count wins" arithmetic for us.
+     */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class PollSummary {
+
+        @JacksonXmlProperty(isAttribute = true)
+        private String name;
+
+        @JacksonXmlProperty(localName = "result")
+        @JacksonXmlElementWrapper(useWrapping = false)
+        private List<PollSummaryResult> results = new ArrayList<>();
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public List<PollSummaryResult> getResults() { return results; }
+        public void setResults(List<PollSummaryResult> results) { this.results = results != null ? results : new ArrayList<>(); }
+    }
+
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    public static class PollSummaryResult {
+
+        @JacksonXmlProperty(isAttribute = true)
+        private String name;
+
+        @JacksonXmlProperty(isAttribute = true)
+        private String value;
+
+        public String getName() { return name; }
+        public void setName(String name) { this.name = name; }
+        public String getValue() { return value; }
+        public void setValue(String value) { this.value = value; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

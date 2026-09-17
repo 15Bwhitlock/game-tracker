@@ -81,6 +81,7 @@ public class GameService {
         existing.setThumbnailUrl(updates.getThumbnailUrl());
         existing.setImageUrl(updates.getImageUrl());
         existing.setYearPublished(updates.getYearPublished());
+        existing.setBestPlayerCounts(updates.getBestPlayerCounts());
         existing.setOwnedSince(updates.getOwnedSince());
         existing.setPersonalRating(updates.getPersonalRating());
         existing.setNotes(updates.getNotes());

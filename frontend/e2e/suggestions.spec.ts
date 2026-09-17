@@ -341,4 +341,41 @@ test.describe('Suggestions page', () => {
       await deleteGame(request, id);
     }
   });
+
+  test('a game BGG marks "best" for the requested player count is ranked above one that is not', async ({ page, request }) => {
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const bestTitle = e2eTitle('best with four');
+    const otherTitle = e2eTitle('also fits four');
+    const bestId = await seedGame(request, {
+      title: bestTitle, minPlayers: 2, maxPlayers: 4, categories: [category], bestPlayerCounts: [4]
+    });
+    const otherId = await seedGame(request, {
+      title: otherTitle, minPlayers: 2, maxPlayers: 4, categories: [category], bestPlayerCounts: [2]
+    });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '4', exact: true }).click();
+      await page.getByRole('button', { name: category, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+
+      const bestResult = page.locator('li.suggestion', { hasText: bestTitle });
+      const otherResult = page.locator('li.suggestion', { hasText: otherTitle });
+      await expect(bestResult).toBeVisible();
+      await expect(otherResult).toBeVisible();
+      await expect(bestResult).toContainText('Best with 4 players');
+
+      // Both games are otherwise identical, so the "best with 4" bonus should
+      // rank bestTitle strictly ahead of otherTitle in the results list.
+      const titles = await page.locator('li.suggestion .suggestion__title').allTextContents();
+      const bestIndex = titles.findIndex((t) => t.includes(bestTitle));
+      const otherIndex = titles.findIndex((t) => t.includes(otherTitle));
+      expect(bestIndex).toBeGreaterThanOrEqual(0);
+      expect(otherIndex).toBeGreaterThanOrEqual(0);
+      expect(bestIndex).toBeLessThan(otherIndex);
+    } finally {
+      await deleteGame(request, bestId);
+      await deleteGame(request, otherId);
+    }
+  });
 });

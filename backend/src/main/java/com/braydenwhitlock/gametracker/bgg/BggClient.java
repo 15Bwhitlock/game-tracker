@@ -23,6 +23,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Client for BoardGameGeek's XML API2.
@@ -56,6 +59,10 @@ public class BggClient {
     // distinct from our own Caffeine cache. Retry a few times before giving up.
     private static final int THING_MAX_RETRIES = 3;
     private static final Duration THING_RETRY_DELAY = Duration.ofSeconds(2);
+
+    // Matches a bare integer or a range like "3-4"/"3–4" (BGG uses both a hyphen and an
+    // en dash depending on endpoint/era) inside text like "Best with 2–4, 6 players".
+    private static final Pattern PLAYER_COUNT_TOKEN = Pattern.compile("(\\d+)(?:[-–](\\d+))?");
 
     private final RestClient restClient;
     private final String apiToken;
@@ -230,7 +237,42 @@ public class BggClient {
                 parseInteger(item.getMaxPlayTime()),
                 averageWeight(item),
                 linkValues(item.getLinks(), "boardgamecategory"),
-                linkValues(item.getLinks(), "boardgamemechanic")));
+                linkValues(item.getLinks(), "boardgamemechanic"),
+                bestPlayerCounts(item)));
+    }
+
+    /**
+     * Reads BGG's own precomputed "bestwith" summary (e.g. "Best with 4 players" or
+     * "Best with 2–4 players") from the suggested_numplayers poll and expands it into
+     * the individual counts. Package-private so tests can drive it directly.
+     */
+    static List<Integer> bestPlayerCounts(BggThingResponse.Item item) {
+        for (BggThingResponse.PollSummary summary : item.getPollSummaries()) {
+            if (!"suggested_numplayers".equals(summary.getName())) continue;
+            for (BggThingResponse.PollSummaryResult result : summary.getResults()) {
+                if ("bestwith".equals(result.getName()) && result.getValue() != null) {
+                    return expandPlayerCountRanges(result.getValue());
+                }
+            }
+        }
+        return List.of();
+    }
+
+    // Pulls every integer and "N–M"/"N-M" range out of a string like "Best with 2–4, 6
+    // players" and expands ranges into individual counts. BGG's punctuation here isn't
+    // perfectly consistent (en dash vs hyphen), so both are matched.
+    static List<Integer> expandPlayerCountRanges(String text) {
+        Set<Integer> counts = new java.util.TreeSet<>();
+        Matcher matcher = PLAYER_COUNT_TOKEN.matcher(text);
+        while (matcher.find()) {
+            int from = Integer.parseInt(matcher.group(1));
+            String toGroup = matcher.group(2);
+            int to = toGroup != null ? Integer.parseInt(toGroup) : from;
+            for (int n = from; n <= to && n - from < 20; n++) {
+                counts.add(n);
+            }
+        }
+        return new ArrayList<>(counts);
     }
 
     private static String primaryName(List<BggValueAttr> names) {
