@@ -155,6 +155,22 @@ export class GameList implements OnInit {
     });
   }
 
+  // Downloads the full collection (not just the current search/filter view — a backup
+  // should never silently drop games because a filter happened to be active) as a JSON
+  // file. Keeps every field, including arrays like categories/bestPlayerCounts, so the
+  // file is a faithful enough snapshot to restore from if the database were ever lost.
+  exportCollection(): void {
+    const json = JSON.stringify(this.games(), null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const date = new Date().toISOString().slice(0, 10);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `game-tracker-export-${date}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   readonly formatDate = formatDate;
   readonly formatTime = formatTime;
 

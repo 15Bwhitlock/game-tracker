@@ -316,6 +316,7 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
   - [x] Swagger/OpenAPI (`springdoc-openapi`) — `/swagger-ui/index.html`, `/v3/api-docs`; `@Operation`/`@Tag` on all controllers
   - [x] Production build — `frontend-maven-plugin` builds Angular and copies dist into Spring Boot `static/`; `WebConfig` forwards unknown routes to `index.html` for Angular router
   - [x] "Refresh from BGG" button on the edit form for already-linked games — re-fetches and re-applies BGG data (title/players/time/complexity/categories/mechanics/images/year/best-player-counts/notes) without a fresh search; shares the same apply/confirm/Undo machinery as the add-form import
+  - [x] Export/backup — "Export" button on the Collection page downloads the whole collection as a timestamped JSON file, client-side, no new endpoint
 
 ---
 
@@ -327,6 +328,8 @@ If a reviewer (or future-you) would ask "why does this do that?", write a commen
 ---
 
 ## Decisions log
+
+- **2026-09-16** — **Export/backup.** Third of the "do it all" batch. Added an "Export" button to the Collection page header that downloads the entire collection (ignoring any active search/filter, so a backup never silently drops games) as a timestamped JSON file (`game-tracker-export-YYYY-MM-DD.json`) via a client-side `Blob` + `URL.createObjectURL` — no new backend endpoint needed since the full game list is already loaded client-side. JSON over CSV to keep array fields (categories, mechanics, bestPlayerCounts) faithful without a flattening scheme, so the file could plausibly be used as a real restore source later. New e2e test seeds a game, clicks Export, and asserts on the downloaded file's name and contents (via Playwright's `download` event + reading the saved file). 70 backend + 71 e2e tests pass.
 
 - **2026-09-16** — **"Refresh from BGG" button on the edit form.** Second of the "do it all" batch of proposed improvements. Games imported from BGG before a field like `bestPlayerCounts` existed (or before BGG itself corrected/expanded a listing) had no way to pick up new data short of deleting and re-adding the game. Extracted the field-merging logic `importBggGame()` already had into a shared `applyBggDetails()`, then added `refreshFromBgg()` which calls it against the game's existing `bggId` instead of a fresh search result. Reused the exact same confirmation banner, "missing personal fields" nudge, and snapshot-based Undo the add-form import already had — no new UI concepts, just a new entry point into the same machinery, shown only in edit mode and only once a game already carries a `bggId`. New e2e tests seed a Catan-linked game with stale metadata, confirm the refresh button corrects it, and confirm Undo restores the pre-refresh state (including personal notes) exactly. 70 backend + 70 e2e tests pass.
 
