@@ -189,6 +189,43 @@ test.describe('Wishlist page', () => {
     }
   });
 
+  test('viewing a BGG search result opens its detail before adding it', async ({ page, request }) => {
+    // Real BGG network call — same skip convention as the other search-dependent tests.
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/wishlist');
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+
+    // Same "first actionable result" reasoning as the other search test — a prior
+    // run's leftover, or the real collection, could flag any given hit already.
+    const result = page.locator('.search-result').filter({
+      has: page.getByRole('button', { name: 'Add to Wishlist' })
+    }).first();
+    await expect(result).toBeVisible();
+
+    await result.locator('.title-btn').click();
+    const dialog = page.locator('dialog.modal--detail');
+    await expect(dialog).toBeVisible();
+    // The modal fetched the full record — the "Notes" section only ever renders
+    // for items already on the wishlist, so it must be absent for a pre-add preview.
+    await expect(dialog.locator('.detail-label', { hasText: 'Notes' })).toHaveCount(0);
+
+    // Adding straight from the preview works, and closes out to the updated list.
+    await dialog.getByRole('button', { name: 'Add to Wishlist' }).click();
+    await expect(dialog.getByText(/already own|in wishlist/)).toBeVisible({ timeout: 10_000 });
+
+    const items = await (await request.get('/api/wishlist')).json();
+    const title = await dialog.locator('h2').innerText();
+    const added = items.find((i: { title: string }) => title.startsWith(i.title));
+    expect(added).toBeDefined();
+
+    await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
+    if (added) await deleteWishlistItem(request, added.id);
+  });
+
   test('browsing trending games and adding one shows it on the wishlist', async ({ page, request }) => {
     // Real BGG network call — same skip convention as above. Also genuinely slow on a
     // cold cache (BggClient rate-limit-paces ~50 sequential lookups, ~30s+) — raise

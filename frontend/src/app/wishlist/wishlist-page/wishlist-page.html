@@ -42,7 +42,12 @@
           @for (hit of searchResults(); track hit.bggId) {
             <li class="search-result">
               <span class="search-result__name">
-                {{ hit.name }}
+                <button
+                  type="button"
+                  class="title-btn"
+                  [disabled]="loadingDetailBggId() === hit.bggId"
+                  (click)="openSearchHitDetail(hit)"
+                >{{ loadingDetailBggId() === hit.bggId ? 'Loading…' : hit.name }}</button>
                 @if (hit.yearPublished) {
                   <span class="muted">({{ hit.yearPublished }})</span>
                 }
