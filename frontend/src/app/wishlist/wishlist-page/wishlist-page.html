@@ -124,16 +124,16 @@
         <div class="wishlist-grid">
           @for (card of filteredCards(); track card.wishlistId) {
             <article class="wishlist-tile">
-              <div class="wishlist-tile__cover">
+              <button type="button" class="wishlist-tile__cover" (click)="openDetail(card)">
                 @if (card.imageUrl || card.thumbnailUrl) {
                   <img [src]="card.imageUrl || card.thumbnailUrl" alt="" />
                 } @else {
                   <span class="wishlist-tile__placeholder" aria-hidden="true">🎲</span>
                 }
-              </div>
+              </button>
               <div class="wishlist-tile__body">
                 <h3 class="wishlist-tile__title">
-                  {{ card.title }}
+                  <button type="button" class="title-btn" (click)="openDetail(card)">{{ card.title }}</button>
                   @if (card.yearPublished) {
                     <span class="muted">({{ card.yearPublished }})</span>
                   }
@@ -182,16 +182,16 @@
         <div class="wishlist-grid">
           @for (card of filteredCards(); track card.bggId) {
             <article class="wishlist-tile">
-              <div class="wishlist-tile__cover">
+              <button type="button" class="wishlist-tile__cover" (click)="openDetail(card)">
                 @if (card.imageUrl || card.thumbnailUrl) {
                   <img [src]="card.imageUrl || card.thumbnailUrl" alt="" />
                 } @else {
                   <span class="wishlist-tile__placeholder" aria-hidden="true">🎲</span>
                 }
-              </div>
+              </button>
               <div class="wishlist-tile__body">
                 <h3 class="wishlist-tile__title">
-                  {{ card.title }}
+                  <button type="button" class="title-btn" (click)="openDetail(card)">{{ card.title }}</button>
                   @if (card.yearPublished) {
                     <span class="muted">({{ card.yearPublished }})</span>
                   }
@@ -227,4 +227,140 @@
       }
     }
   </div>
+
+  <dialog #detailDialog class="modal modal--detail" (click)="$event.target === $event.currentTarget && closeDetail()">
+    @if (selectedCard(); as card) {
+      <div class="modal__content">
+        <header class="modal__header">
+          <h2>
+            {{ card.title }}
+            @if (card.yearPublished) {
+              <span class="modal__header-year">({{ card.yearPublished }})</span>
+            }
+          </h2>
+          <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
+        </header>
+
+        @if (card.imageUrl || card.thumbnailUrl) {
+          <img class="detail-image" [src]="card.imageUrl || card.thumbnailUrl" alt="" />
+        }
+
+        <div class="detail-grid">
+          <div class="detail-item">
+            <span class="detail-label">Players</span>
+            <span class="detail-value">
+              @if (card.minPlayers != null && card.maxPlayers != null) {
+                @if (card.minPlayers === card.maxPlayers) {
+                  {{ card.minPlayers }}
+                } @else {
+                  {{ card.minPlayers }}–{{ card.maxPlayers }}
+                }
+              } @else {
+                —
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Play Time</span>
+            <span class="detail-value">
+              @if (card.minPlayTimeMinutes != null && card.maxPlayTimeMinutes != null) {
+                @if (card.minPlayTimeMinutes === card.maxPlayTimeMinutes) {
+                  {{ formatTime(card.minPlayTimeMinutes) }}
+                } @else {
+                  {{ formatTime(card.minPlayTimeMinutes) }}–{{ formatTime(card.maxPlayTimeMinutes) }}
+                }
+              } @else {
+                —
+              }
+            </span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">Complexity</span>
+            <span class="detail-value">{{ card.complexityWeight != null ? (card.complexityWeight | number:'1.1-2') + ' / 5' : '—' }}</span>
+          </div>
+        </div>
+
+        @if (card.categories.length) {
+          <div class="detail-section">
+            <span class="detail-label">Categories</span>
+            <div class="tag-list">
+              @for (cat of card.categories; track cat) {
+                <span class="tag">{{ cat }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (card.mechanics.length) {
+          <div class="detail-section">
+            <span class="detail-label">Mechanics</span>
+            <div class="tag-list">
+              @for (m of card.mechanics; track m) {
+                <span class="tag">{{ m }}</span>
+              }
+            </div>
+          </div>
+        }
+
+        @if (card.wishlistId != null) {
+          <div class="detail-section">
+            <div class="detail-label-row">
+              <span class="detail-label">Notes</span>
+              @if (!editingNotes()) {
+                <button
+                  type="button"
+                  class="btn--icon"
+                  [title]="card.notes ? 'Edit note' : 'Add a note'"
+                  (click)="startEditNotes(card)"
+                >{{ card.notes ? '📝' : '➕📝' }}</button>
+              }
+            </div>
+            @if (editingNotes()) {
+              <div class="detail-notes-edit">
+                <textarea
+                  rows="3"
+                  placeholder="Personal thoughts, why it's on your list…"
+                  [ngModel]="editingNotesValue()"
+                  (ngModelChange)="editingNotesValue.set($event)"
+                  [ngModelOptions]="{ standalone: true }"
+                ></textarea>
+                <div class="detail-notes-edit__actions">
+                  <button type="button" class="btn btn--ghost btn--sm" [disabled]="savingNotes()" (click)="cancelEditNotes()">Cancel</button>
+                  <button type="button" class="btn btn--primary btn--sm" [disabled]="savingNotes()" (click)="saveNotes(card)">
+                    {{ savingNotes() ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </div>
+            } @else if (card.notes) {
+              <p class="detail-notes">{{ card.notes }}</p>
+            }
+          </div>
+        }
+
+        <footer class="modal__footer">
+          <button type="button" class="btn btn--ghost" (click)="closeDetail()">Close</button>
+          @if (card.wishlistId != null) {
+            <button
+              type="button"
+              class="btn btn--ghost"
+              [disabled]="movingId() === card.wishlistId"
+              (click)="moveToCollection(card.wishlistId!)"
+            >{{ movingId() === card.wishlistId ? 'Moving…' : 'Move to Collection' }}</button>
+            <button type="button" class="btn btn--danger" (click)="remove(card.wishlistId!)">Remove</button>
+          } @else if (card.bggId != null && ownedBggIds().has(card.bggId)) {
+            <span class="tag-suggestion-badge">already own</span>
+          } @else if (card.bggId != null && wishlistBggIds().has(card.bggId)) {
+            <span class="tag-suggestion-badge">in wishlist</span>
+          } @else {
+            <button
+              type="button"
+              class="btn btn--primary"
+              [disabled]="addingBggId() === card.bggId"
+              (click)="addTrendingToWishlist(card.trendingSource!)"
+            >{{ addingBggId() === card.bggId ? 'Adding…' : 'Add to Wishlist' }}</button>
+          }
+        </footer>
+      </div>
+    }
+  </dialog>
 </section>

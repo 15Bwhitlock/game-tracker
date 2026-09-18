@@ -42,6 +42,12 @@ public class WishlistService {
         return wishlistRepository.save(item);
     }
 
+    public Wishlist updateNotes(Long id, String notes) {
+        Wishlist item = findById(id);
+        item.setNotes(notes);
+        return wishlistRepository.save(item);
+    }
+
     public void delete(Long id) {
         if (!wishlistRepository.existsById(id)) {
             throw new WishlistNotFoundException(id);

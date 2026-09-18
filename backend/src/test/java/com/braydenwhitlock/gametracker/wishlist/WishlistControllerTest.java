@@ -77,6 +77,33 @@ class WishlistControllerTest {
                 .andExpect(status().isBadRequest());
     }
 
+    // --- PATCH /api/wishlist/{id}/notes ---
+
+    @Test
+    void updateNotesReturnsUpdatedItem() throws Exception {
+        Wishlist updated = sampleItem();
+        updated.setId(1L);
+        updated.setNotes("Heard great things");
+        when(wishlistService.updateNotes(1L, "Heard great things")).thenReturn(updated);
+
+        mvc.perform(patch("/api/wishlist/1/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"notes\":\"Heard great things\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notes").value("Heard great things"));
+    }
+
+    @Test
+    void updateNotesReturns404WhenNotFound() throws Exception {
+        when(wishlistService.updateNotes(99L, "x")).thenThrow(new WishlistNotFoundException(99L));
+
+        mvc.perform(patch("/api/wishlist/99/notes")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"notes\":\"x\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("Wishlist item not found: 99"));
+    }
+
     // --- DELETE /api/wishlist/{id} ---
 
     @Test

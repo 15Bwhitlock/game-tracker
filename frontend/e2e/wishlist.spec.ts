@@ -27,6 +27,85 @@ test.describe('Wishlist page', () => {
     }
   });
 
+  test('clicking a wishlist tile opens a detail modal with full info', async ({ page, request }) => {
+    const title = e2eTitle('wishlist detail');
+    const id = await seedWishlistItem(request, {
+      title,
+      categories: ['Strategy'],
+      mechanics: ['Drafting'],
+      notes: 'Heard great things about this one',
+      minPlayers: 2,
+      maxPlayers: 4,
+      minPlayTimeMinutes: 30,
+      maxPlayTimeMinutes: 60,
+      complexityWeight: 2.5
+    });
+
+    try {
+      await page.goto('/wishlist');
+      const tile = page.locator('.wishlist-tile', { hasText: title });
+      await expect(tile).toBeVisible();
+
+      await tile.getByRole('button', { name: title }).click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.getByRole('heading', { name: title })).toBeVisible();
+      await expect(dialog).toContainText('2–4');
+      await expect(dialog).toContainText('2.5 / 5');
+      await expect(dialog.locator('.tag', { hasText: 'Strategy' })).toBeVisible();
+      await expect(dialog.locator('.tag', { hasText: 'Drafting' })).toBeVisible();
+      await expect(dialog).toContainText('Heard great things about this one');
+
+      // Clicking the cover image opens the same modal. (Both the × icon and the
+      // footer button are named "Close" — the × uses aria-label, so scope to the footer.)
+      await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
+      await expect(dialog).not.toBeVisible();
+      await tile.locator('.wishlist-tile__cover').click();
+      await expect(dialog).toBeVisible();
+
+      // Remove works from inside the modal too, and closes it.
+      await dialog.getByRole('button', { name: 'Remove' }).click();
+      await expect(dialog).not.toBeVisible();
+      await expect(page.locator('.wishlist-tile', { hasText: title })).not.toBeVisible();
+    } finally {
+      await deleteWishlistItem(request, id);
+    }
+  });
+
+  test('adding and editing a note on a wishlist item from the detail modal', async ({ page, request }) => {
+    const title = e2eTitle('wishlist notes');
+    const id = await seedWishlistItem(request, { title });
+
+    try {
+      await page.goto('/wishlist');
+      const tile = page.locator('.wishlist-tile', { hasText: title });
+      await expect(tile).toBeVisible();
+
+      await tile.locator('.title-btn').click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+
+      // No note yet — the icon button offers to add one.
+      await dialog.getByTitle('Add a note').click();
+      await dialog.locator('textarea').fill('Great with the expansion');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(dialog.locator('.detail-notes')).toHaveText('Great with the expansion');
+
+      // Editing an existing note pre-fills the textarea with the current value.
+      await dialog.getByTitle('Edit note').click();
+      await expect(dialog.locator('textarea')).toHaveValue('Great with the expansion');
+      await dialog.locator('textarea').fill('Actually skip the expansion');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(dialog.locator('.detail-notes')).toHaveText('Actually skip the expansion');
+
+      // The tile itself reflects the updated note too, without a reload.
+      await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
+      await expect(tile.locator('.wishlist-tile__notes')).toHaveText('Actually skip the expansion');
+    } finally {
+      await deleteWishlistItem(request, id);
+    }
+  });
+
   test('removing a wishlist item takes it off the list', async ({ page, request }) => {
     const title = e2eTitle('wishlist remove');
     const id = await seedWishlistItem(request, { title });
@@ -35,7 +114,7 @@ test.describe('Wishlist page', () => {
     const tile = page.locator('.wishlist-tile', { hasText: title });
     await expect(tile).toBeVisible();
 
-    await tile.getByRole('button', { name: 'Remove' }).click();
+    await tile.getByRole('button', { name: 'Remove', exact: true }).click();
     await expect(page.locator('.wishlist-tile', { hasText: title })).not.toBeVisible();
 
     const remaining = await request.get('/api/wishlist');
@@ -124,23 +203,36 @@ test.describe('Wishlist page', () => {
     await page.goto('/wishlist');
     await page.getByRole('button', { name: 'Browse Trending', exact: true }).click();
 
-    const firstTile = page.locator('.wishlist-tile').first();
-    await expect(firstTile).toBeVisible({ timeout: 90_000 });
+    // The trending list can include games this run's real collection/wishlist
+    // already has flagged "already own"/"in wishlist" (no "Add to Wishlist" button
+    // on those tiles) — same reasoning as the BGG-search test above: only the
+    // first *actionable* tile matters, not literally the first one. This filtered
+    // locator is re-evaluated live on every query, so it's only used up to the
+    // click — once the button it filters on disappears, it stops matching anything.
+    const actionableTile = page.locator('.wishlist-tile').filter({
+      has: page.getByRole('button', { name: 'Add to Wishlist' })
+    }).first();
+    await expect(actionableTile).toBeVisible({ timeout: 90_000 });
 
-    const title = await firstTile.locator('.wishlist-tile__title').innerText();
-    await firstTile.getByRole('button', { name: 'Add to Wishlist' }).click();
+    // .title-btn holds just the game's name — the sibling year span (e.g. "(2024)")
+    // would otherwise get pulled into a plain .wishlist-tile__title innerText read.
+    // Captured before the click and used afterward: a title-based locator stays
+    // valid once the tile's "Add to Wishlist" button (and so actionableTile) is gone.
+    const title = await actionableTile.locator('.title-btn').innerText();
+    const tile = page.locator('.wishlist-tile').filter({ has: page.locator('.title-btn', { hasText: title, exact: true }) });
+    await actionableTile.getByRole('button', { name: 'Add to Wishlist' }).click();
 
     try {
-      await expect(firstTile.getByText(/already own|in wishlist/)).toBeVisible({ timeout: 10_000 });
+      await expect(tile.getByText(/already own|in wishlist/)).toBeVisible({ timeout: 10_000 });
 
       await page.getByRole('button', { name: /^My Wishlist/ }).click();
-      await expect(page.locator('.wishlist-tile', { hasText: title.split(' (')[0] })).toBeVisible();
+      await expect(page.locator('.wishlist-tile').filter({ has: page.locator('.title-btn', { hasText: title, exact: true }) })).toBeVisible();
     } finally {
       // A real BGG title, not an "E2e"-prefixed one, so the describe block's
       // afterEach safety net (which only sweeps by that prefix) won't catch this —
       // clean it up explicitly regardless of how the assertions above went.
       const items = await (await request.get('/api/wishlist')).json();
-      const added = items.find((i: { title: string }) => i.title === title.split(' (')[0]);
+      const added = items.find((i: { title: string }) => i.title === title);
       if (added) await deleteWishlistItem(request, added.id);
     }
   });
