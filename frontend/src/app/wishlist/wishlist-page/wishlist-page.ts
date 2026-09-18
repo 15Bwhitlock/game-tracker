@@ -29,6 +29,26 @@ interface WishlistCard {
   trendingSource?: BggGameDetails; // present only for "trending" cards — needed to add
 }
 
+// Shared by the "Browse Trending" pool and the search-by-name detail preview —
+// both start from the same BggGameDetails shape, just fetched at different times.
+function cardFromDetails(details: BggGameDetails): WishlistCard {
+  return {
+    bggId: details.bggId,
+    title: details.title,
+    yearPublished: details.yearPublished,
+    thumbnailUrl: details.thumbnailUrl,
+    imageUrl: details.imageUrl,
+    minPlayers: details.minPlayers,
+    maxPlayers: details.maxPlayers,
+    minPlayTimeMinutes: details.minPlayTimeMinutes,
+    maxPlayTimeMinutes: details.maxPlayTimeMinutes,
+    complexityWeight: details.complexityWeight,
+    categories: details.categories,
+    mechanics: details.mechanics,
+    trendingSource: details
+  };
+}
+
 @Component({
   selector: 'app-wishlist-page',
   imports: [FormsModule, DecimalPipe],
@@ -64,6 +84,7 @@ export class WishlistPage implements OnInit {
   readonly searched = signal(false);
   readonly searchError = signal<string | null>(null);
   readonly addingBggId = signal<number | null>(null);
+  readonly loadingDetailBggId = signal<number | null>(null);
 
   readonly selectedCategories = signal<string[]>([]);
   readonly selectedMechanics = signal<string[]>([]);
@@ -95,21 +116,7 @@ export class WishlistPage implements OnInit {
           notes: w.notes,
           wishlistId: w.id
         }))
-      : this.trending().map(g => ({
-          bggId: g.bggId,
-          title: g.title,
-          yearPublished: g.yearPublished,
-          thumbnailUrl: g.thumbnailUrl,
-          imageUrl: g.imageUrl,
-          minPlayers: g.minPlayers,
-          maxPlayers: g.maxPlayers,
-          minPlayTimeMinutes: g.minPlayTimeMinutes,
-          maxPlayTimeMinutes: g.maxPlayTimeMinutes,
-          complexityWeight: g.complexityWeight,
-          categories: g.categories,
-          mechanics: g.mechanics,
-          trendingSource: g
-        }))
+      : this.trending().map(g => cardFromDetails(g))
   );
 
   // Only categories/mechanics actually present in the current tab's pool — same
@@ -261,6 +268,23 @@ export class WishlistPage implements OnInit {
       error: err => {
         this.searchError.set(describeHttpError(err));
         this.searching.set(false);
+      }
+    });
+  }
+
+  // Search results only carry name/year (BggSearchHit) — fetch the full record
+  // on demand so a hit can be previewed the same way trending/wishlist cards are,
+  // before ever adding it.
+  openSearchHitDetail(hit: BggSearchHit): void {
+    this.loadingDetailBggId.set(hit.bggId);
+    this.bggApi.details(hit.bggId).subscribe({
+      next: details => {
+        this.loadingDetailBggId.set(null);
+        this.openDetail(cardFromDetails(details));
+      },
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.loadingDetailBggId.set(null);
       }
     });
   }
