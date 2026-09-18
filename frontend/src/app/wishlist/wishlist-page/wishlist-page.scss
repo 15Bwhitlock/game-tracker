@@ -438,6 +438,16 @@
   line-height: 1.6;
 }
 
+.detail-description {
+  margin: 0;
+  font-size: 0.88rem;
+  color: var(--text-body);
+  line-height: 1.6;
+  white-space: pre-line;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 .detail-label-row {
   display: flex;
   align-items: center;

@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 
 import { BggApi, GameApi, WishlistApi } from '@shared/api';
 import { BggGameDetails, BggSearchHit, Wishlist } from '@shared/models';
-import { describeHttpError, formatTime } from '@shared/services';
+import { decodeBggDescription, describeHttpError, formatTime } from '@shared/services';
 
 type Tab = 'mine' | 'trending';
 
@@ -25,6 +25,8 @@ interface WishlistCard {
   categories: string[];
   mechanics: string[];
   notes?: string | null;
+  description?: string | null; // BGG's own blurb — only set pre-add (see cardFromDetails);
+                                // once on the wishlist it lives on as the (editable) notes instead
   wishlistId?: number; // present only for "mine" cards — needed for remove/move actions
   trendingSource?: BggGameDetails; // present only for "trending" cards — needed to add
 }
@@ -45,6 +47,7 @@ function cardFromDetails(details: BggGameDetails): WishlistCard {
     complexityWeight: details.complexityWeight,
     categories: details.categories,
     mechanics: details.mechanics,
+    description: details.description ? decodeBggDescription(details.description) : null,
     trendingSource: details
   };
 }
@@ -323,7 +326,8 @@ export class WishlistPage implements OnInit {
       maxPlayTimeMinutes: details.maxPlayTimeMinutes,
       complexityWeight: details.complexityWeight,
       categories: details.categories,
-      mechanics: details.mechanics
+      mechanics: details.mechanics,
+      notes: details.description ? decodeBggDescription(details.description) : null
     };
     this.wishlistApi.add(item).subscribe({
       next: saved => {

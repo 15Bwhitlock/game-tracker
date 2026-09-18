@@ -307,6 +307,13 @@
           </div>
         }
 
+        @if (card.wishlistId == null && card.description) {
+          <div class="detail-section">
+            <span class="detail-label">Description</span>
+            <p class="detail-description">{{ card.description }}</p>
+          </div>
+        }
+
         @if (card.wishlistId != null) {
           <div class="detail-section">
             <div class="detail-label-row">

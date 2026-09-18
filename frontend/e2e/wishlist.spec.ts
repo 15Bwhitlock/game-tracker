@@ -212,6 +212,13 @@ test.describe('Wishlist page', () => {
     // The modal fetched the full record — the "Notes" section only ever renders
     // for items already on the wishlist, so it must be absent for a pre-add preview.
     await expect(dialog.locator('.detail-label', { hasText: 'Notes' })).toHaveCount(0);
+    // BGG's own blurb is shown instead, as real decoded text (see decodeBggDescription) —
+    // not raw HTML entities/tags left undecoded.
+    await expect(dialog.locator('.detail-label', { hasText: 'Description' })).toBeVisible();
+    const description = await dialog.locator('.detail-description').innerText();
+    expect(description.length).toBeGreaterThan(0);
+    expect(description).not.toMatch(/&[a-z#0-9]+;/i);
+    expect(description).not.toMatch(/<[a-z][^>]*>/i);
 
     // Adding straight from the preview works, and closes out to the updated list.
     await dialog.getByRole('button', { name: 'Add to Wishlist' }).click();
@@ -221,6 +228,8 @@ test.describe('Wishlist page', () => {
     const title = await dialog.locator('h2').innerText();
     const added = items.find((i: { title: string }) => title.startsWith(i.title));
     expect(added).toBeDefined();
+    // The description that was just previewed becomes the item's (editable) notes.
+    expect(added.notes).toBe(description);
 
     await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
     if (added) await deleteWishlistItem(request, added.id);
@@ -250,6 +259,16 @@ test.describe('Wishlist page', () => {
       has: page.getByRole('button', { name: 'Add to Wishlist' })
     }).first();
     await expect(actionableTile).toBeVisible({ timeout: 90_000 });
+
+    // Trending cards aren't wishlisted yet, so their detail modal shows BGG's own
+    // description rather than a personal note — same as the search-preview modal.
+    await actionableTile.locator('.title-btn').click();
+    const dialog = page.locator('dialog.modal--detail');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.detail-label', { hasText: 'Description' })).toBeVisible();
+    await expect(dialog.locator('.detail-description')).not.toBeEmpty();
+    await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
+    await expect(dialog).not.toBeVisible();
 
     // .title-btn holds just the game's name — the sibling year span (e.g. "(2024)")
     // would otherwise get pulled into a plain .wishlist-tile__title innerText read.
