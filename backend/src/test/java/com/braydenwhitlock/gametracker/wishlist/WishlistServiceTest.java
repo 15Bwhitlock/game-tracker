@@ -62,6 +62,27 @@ class WishlistServiceTest {
     }
 
     @Test
+    void updateNotesSetsAndSavesTheNote() {
+        Wishlist item = new Wishlist();
+        item.setId(1L);
+        item.setTitle("Gloomhaven");
+        when(wishlistRepo.findById(1L)).thenReturn(Optional.of(item));
+        when(wishlistRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Wishlist updated = service.updateNotes(1L, "Heard great things");
+
+        assertThat(updated.getNotes()).isEqualTo("Heard great things");
+    }
+
+    @Test
+    void updateNotesThrowsWhenItemDoesNotExist() {
+        when(wishlistRepo.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.updateNotes(99L, "x"))
+                .isInstanceOf(WishlistNotFoundException.class);
+    }
+
+    @Test
     void moveToCollectionCopiesFieldsAndDeletesTheWishlistRow() {
         Wishlist item = new Wishlist();
         item.setId(1L);

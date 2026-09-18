@@ -24,6 +24,10 @@ export class WishlistApi {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
   }
 
+  updateNotes(id: number, notes: string | null): Observable<Wishlist> {
+    return this.http.patch<Wishlist>(`${this.baseUrl}/${id}/notes`, { notes });
+  }
+
   // Converts a wishlist entry into an owned Game and removes it from the wishlist.
   // Returns the newly-created Game.
   moveToCollection(id: number): Observable<Game> {

@@ -104,6 +104,13 @@ export interface SeedWishlistOptions {
   categories?: string[];
   mechanics?: string[];
   notes?: string | null;
+  minPlayers?: number | null;
+  maxPlayers?: number | null;
+  minPlayTimeMinutes?: number | null;
+  maxPlayTimeMinutes?: number | null;
+  complexityWeight?: number | null;
+  thumbnailUrl?: string | null;
+  imageUrl?: string | null;
 }
 
 /** Creates a wishlist item via POST /api/wishlist and returns its id. */
@@ -114,7 +121,14 @@ export async function seedWishlistItem(request: APIRequestContext, options: Seed
       bggId: options.bggId ?? null,
       categories: options.categories ?? [],
       mechanics: options.mechanics ?? [],
-      notes: options.notes ?? null
+      notes: options.notes ?? null,
+      minPlayers: options.minPlayers ?? null,
+      maxPlayers: options.maxPlayers ?? null,
+      minPlayTimeMinutes: options.minPlayTimeMinutes ?? null,
+      maxPlayTimeMinutes: options.maxPlayTimeMinutes ?? null,
+      complexityWeight: options.complexityWeight ?? null,
+      thumbnailUrl: options.thumbnailUrl ?? null,
+      imageUrl: options.imageUrl ?? null
     }
   });
   expect(response.ok(), `seedWishlistItem failed: ${response.status()} ${await response.text()}`).toBeTruthy();

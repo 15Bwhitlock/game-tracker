@@ -1,10 +1,11 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DecimalPipe } from '@angular/common';
+import { Component, ElementRef, OnInit, computed, inject, signal, viewChild } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 
 import { BggApi, GameApi, WishlistApi } from '@shared/api';
 import { BggGameDetails, BggSearchHit, Wishlist } from '@shared/models';
-import { describeHttpError } from '@shared/services';
+import { describeHttpError, formatTime } from '@shared/services';
 
 type Tab = 'mine' | 'trending';
 
@@ -16,6 +17,11 @@ interface WishlistCard {
   yearPublished: number | null;
   thumbnailUrl: string | null;
   imageUrl: string | null;
+  minPlayers: number | null;
+  maxPlayers: number | null;
+  minPlayTimeMinutes: number | null;
+  maxPlayTimeMinutes: number | null;
+  complexityWeight: number | null;
   categories: string[];
   mechanics: string[];
   notes?: string | null;
@@ -25,7 +31,7 @@ interface WishlistCard {
 
 @Component({
   selector: 'app-wishlist-page',
-  imports: [FormsModule],
+  imports: [FormsModule, DecimalPipe],
   templateUrl: './wishlist-page.html',
   styleUrl: './wishlist-page.scss'
 })
@@ -62,6 +68,15 @@ export class WishlistPage implements OnInit {
   readonly selectedCategories = signal<string[]>([]);
   readonly selectedMechanics = signal<string[]>([]);
 
+  readonly detailDialog = viewChild<ElementRef<HTMLDialogElement>>('detailDialog');
+  readonly selectedCard = signal<WishlistCard | null>(null);
+
+  readonly editingNotes = signal(false);
+  readonly editingNotesValue = signal('');
+  readonly savingNotes = signal(false);
+
+  readonly formatTime = formatTime;
+
   private readonly currentPool = computed<WishlistCard[]>(() =>
     this.tab() === 'mine'
       ? this.wishlist().map(w => ({
@@ -70,6 +85,11 @@ export class WishlistPage implements OnInit {
           yearPublished: w.yearPublished ?? null,
           thumbnailUrl: w.thumbnailUrl ?? null,
           imageUrl: w.imageUrl ?? null,
+          minPlayers: w.minPlayers ?? null,
+          maxPlayers: w.maxPlayers ?? null,
+          minPlayTimeMinutes: w.minPlayTimeMinutes ?? null,
+          maxPlayTimeMinutes: w.maxPlayTimeMinutes ?? null,
+          complexityWeight: w.complexityWeight ?? null,
           categories: w.categories,
           mechanics: w.mechanics,
           notes: w.notes,
@@ -81,6 +101,11 @@ export class WishlistPage implements OnInit {
           yearPublished: g.yearPublished,
           thumbnailUrl: g.thumbnailUrl,
           imageUrl: g.imageUrl,
+          minPlayers: g.minPlayers,
+          maxPlayers: g.maxPlayers,
+          minPlayTimeMinutes: g.minPlayTimeMinutes,
+          maxPlayTimeMinutes: g.maxPlayTimeMinutes,
+          complexityWeight: g.complexityWeight,
           categories: g.categories,
           mechanics: g.mechanics,
           trendingSource: g
@@ -156,6 +181,49 @@ export class WishlistPage implements OnInit {
       error: err => {
         this.trendingError.set(describeHttpError(err));
         this.loadingTrending.set(false);
+      }
+    });
+  }
+
+  openDetail(card: WishlistCard): void {
+    this.selectedCard.set(card);
+    this.editingNotes.set(false);
+    this.detailDialog()?.nativeElement.showModal();
+  }
+
+  closeDetail(): void {
+    this.detailDialog()?.nativeElement.close();
+    this.selectedCard.set(null);
+    this.editingNotes.set(false);
+  }
+
+  startEditNotes(card: WishlistCard): void {
+    this.editingNotesValue.set(card.notes ?? '');
+    this.editingNotes.set(true);
+  }
+
+  cancelEditNotes(): void {
+    this.editingNotes.set(false);
+    this.editingNotesValue.set('');
+  }
+
+  // Saved immediately via PATCH, same rationale as GameForm's play-notes editor —
+  // a wishlist note isn't part of a larger draft with its own Save/Cancel, so
+  // there's nothing to batch it with.
+  saveNotes(card: WishlistCard): void {
+    if (card.wishlistId == null) return;
+    const notes = this.editingNotesValue().trim() || null;
+    this.savingNotes.set(true);
+    this.wishlistApi.updateNotes(card.wishlistId, notes).subscribe({
+      next: updated => {
+        this.wishlist.update(list => list.map(w => w.id === updated.id ? updated : w));
+        this.selectedCard.update(c => c && c.wishlistId === updated.id ? { ...c, notes: updated.notes } : c);
+        this.editingNotes.set(false);
+        this.savingNotes.set(false);
+      },
+      error: err => {
+        this.wishlistError.set(describeHttpError(err));
+        this.savingNotes.set(false);
       }
     });
   }
@@ -247,7 +315,10 @@ export class WishlistPage implements OnInit {
 
   remove(id: number): void {
     this.wishlistApi.remove(id).subscribe({
-      next: () => this.wishlist.update(list => list.filter(w => w.id !== id)),
+      next: () => {
+        this.wishlist.update(list => list.filter(w => w.id !== id));
+        if (this.selectedCard()?.wishlistId === id) this.closeDetail();
+      },
       error: err => this.wishlistError.set(describeHttpError(err))
     });
   }
