@@ -98,9 +98,12 @@ test.describe('Wishlist page', () => {
       await dialog.getByRole('button', { name: 'Save', exact: true }).click();
       await expect(dialog.locator('.detail-notes')).toHaveText('Actually skip the expansion');
 
-      // The tile itself reflects the updated note too, without a reload.
+      // The note only shows inside the modal — the tile itself stays clean, and
+      // reopening it confirms the update persisted rather than just being local state.
       await dialog.locator('.modal__footer').getByRole('button', { name: 'Close' }).click();
-      await expect(tile.locator('.wishlist-tile__notes')).toHaveText('Actually skip the expansion');
+      await expect(tile).not.toContainText('Actually skip the expansion');
+      await tile.locator('.title-btn').click();
+      await expect(dialog.locator('.detail-notes')).toHaveText('Actually skip the expansion');
     } finally {
       await deleteWishlistItem(request, id);
     }
