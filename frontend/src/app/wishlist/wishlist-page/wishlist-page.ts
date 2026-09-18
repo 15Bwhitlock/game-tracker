@@ -92,6 +92,12 @@ export class WishlistPage implements OnInit {
   readonly selectedCategories = signal<string[]>([]);
   readonly selectedMechanics = signal<string[]>([]);
 
+  // BGG's hot list is a fixed, non-paginated ~50-item snapshot — it's already fully
+  // fetched by loadTrending(), so "Load More" just reveals more of what's in memory
+  // rather than requesting anything further from BGG.
+  private static readonly TRENDING_PAGE_SIZE = 20;
+  readonly visibleTrendingCount = signal(WishlistPage.TRENDING_PAGE_SIZE);
+
   readonly detailDialog = viewChild<ElementRef<HTMLDialogElement>>('detailDialog');
   readonly selectedCard = signal<WishlistCard | null>(null);
 
@@ -147,6 +153,14 @@ export class WishlistPage implements OnInit {
     });
   });
 
+  // Only the Trending tab paginates client-side — My Wishlist is small enough (and
+  // personally curated) to always show in full.
+  readonly visibleCards = computed(() =>
+    this.tab() === 'trending'
+      ? this.filteredCards().slice(0, this.visibleTrendingCount())
+      : this.filteredCards()
+  );
+
   ngOnInit(): void {
     this.loadWishlist();
     this.gameApi.list().subscribe({
@@ -174,9 +188,14 @@ export class WishlistPage implements OnInit {
     this.tab.set(tab);
     this.selectedCategories.set([]);
     this.selectedMechanics.set([]);
+    this.visibleTrendingCount.set(WishlistPage.TRENDING_PAGE_SIZE);
     if (tab === 'trending' && !this.trendingLoaded()) {
       this.loadTrending();
     }
+  }
+
+  loadMoreTrending(): void {
+    this.visibleTrendingCount.update(n => n + WishlistPage.TRENDING_PAGE_SIZE);
   }
 
   private loadTrending(): void {

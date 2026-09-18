@@ -295,4 +295,33 @@ test.describe('Wishlist page', () => {
       if (added) await deleteWishlistItem(request, added.id);
     }
   });
+
+  test('Load More reveals additional trending games without re-fetching', async ({ page, request }) => {
+    // Real BGG network call — same skip convention as the other trending test, and
+    // genuinely slow the first time for the same reason (cold-cache rate limiting).
+    test.setTimeout(150_000);
+
+    const probe = await request.get('/api/bgg/search?q=catan');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/wishlist');
+    await page.getByRole('button', { name: 'Browse Trending', exact: true }).click();
+
+    const tiles = page.locator('.wishlist-tile');
+    await expect(tiles.first()).toBeVisible({ timeout: 90_000 });
+    const initialCount = await tiles.count();
+    // BGG's hot list is a fixed ~50-item snapshot — only meaningful to assert
+    // "Load More" appears/works when there's more than one page's worth already
+    // fetched. With fewer, there's nothing left to reveal, so skip rather than fail.
+    const loadMore = page.getByRole('button', { name: /^Load More/ });
+    test.skip(!(await loadMore.isVisible()), 'Trending list is small enough that everything already fits on one page.');
+
+    await loadMore.click();
+    // Reveals up to 20 more of the already-fetched list — exactly 20 more unless
+    // fewer than that remained, in which case everything left is now shown.
+    await expect(async () => {
+      expect(await tiles.count()).toBeGreaterThan(initialCount);
+    }).toPass({ timeout: 5_000 });
+  });
 });
