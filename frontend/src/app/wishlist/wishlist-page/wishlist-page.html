@@ -182,7 +182,7 @@
         <p class="muted">No trending games match this filter.</p>
       } @else {
         <div class="wishlist-grid">
-          @for (card of filteredCards(); track card.bggId) {
+          @for (card of visibleCards(); track card.bggId) {
             <article class="wishlist-tile">
               <button type="button" class="wishlist-tile__cover" (click)="openDetail(card)">
                 @if (card.imageUrl || card.thumbnailUrl) {
@@ -226,6 +226,13 @@
             </article>
           }
         </div>
+        @if (visibleCards().length < filteredCards().length) {
+          <div class="load-more">
+            <button type="button" class="btn btn--ghost" (click)="loadMoreTrending()">
+              Load More ({{ filteredCards().length - visibleCards().length }} more)
+            </button>
+          </div>
+        }
       }
     }
   </div>
