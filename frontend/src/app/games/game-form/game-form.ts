@@ -7,7 +7,7 @@ import { switchMap, tap } from 'rxjs/operators';
 
 import { BggApi, GameApi, GamePlay } from '@shared/api';
 import { BggGameDetails, BggSearchHit, Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
-import { describeHttpError, formatTime, formatDate } from '@shared/services';
+import { describeHttpError, formatTime, formatDate, decodeBggDescription } from '@shared/services';
 
 interface TagSuggestion {
   name: string;
@@ -64,20 +64,6 @@ function snapPlayTime(n: number | null): number | null {
 function snapComplexity(n: number | null): number | null {
   if (n == null) return null;
   return Math.min(5, Math.max(1, Math.round(n)));
-}
-
-// BGG's description text is XML-escaped and often contains a literal <br/> for line
-// breaks alongside standard HTML entities (e.g. "&amp;rsquo;" for a right single quote).
-// Converting <br/> to a real newline first (before entity-decoding) preserves it —
-// otherwise setting it as textarea.innerHTML would just silently drop the tag. Using
-// the browser's own entity decoder (rather than a hand-rolled regex table) handles
-// every entity BGG might send, including numeric ones, correctly and safely — the
-// result is only ever read back out as a plain string, never re-inserted as HTML.
-function decodeBggDescription(raw: string): string {
-  const withBreaks = raw.replace(/<br\s*\/?>/gi, '\n');
-  const el = document.createElement('textarea');
-  el.innerHTML = withBreaks;
-  return el.value.replace(/<[^>]+>/g, '').trim();
 }
 
 @Component({
