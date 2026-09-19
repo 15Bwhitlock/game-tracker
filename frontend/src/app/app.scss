@@ -1,4 +1,9 @@
 .app-header {
+  position: sticky;
+  top: 0;
+  // Higher than any in-page absolutely-positioned dropdown/menu (several use
+  // z-index: 100) so the sticky header can never end up rendering underneath one.
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;

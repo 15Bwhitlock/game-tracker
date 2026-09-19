@@ -54,6 +54,24 @@ test.describe('App shell', () => {
     }
   });
 
+  test('the header stays pinned to the top of the viewport when the page scrolls', async ({ page }) => {
+    await page.goto('/collection');
+    const header = page.locator('.app-header');
+    await expect(header).toBeVisible();
+    const beforeScroll = await header.boundingBox();
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await expect(async () => {
+      const box = await header.boundingBox();
+      expect(box?.y).toBe(0);
+    }).toPass({ timeout: 2_000 });
+    await expect(header).toBeVisible();
+
+    const afterScroll = await header.boundingBox();
+    expect(afterScroll?.y).toBe(0);
+    expect(afterScroll?.y).toBe(beforeScroll?.y);
+  });
+
   test('an unknown URL renders the 404 page instead of a blank one', async ({ page }) => {
     await page.goto('/this-page-does-not-exist');
     await expect(page.getByRole('heading', { name: '404' })).toBeVisible();
