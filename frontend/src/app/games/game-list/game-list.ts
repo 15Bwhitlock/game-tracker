@@ -41,6 +41,14 @@ export class GameList implements OnInit {
   readonly loading = signal(false);
   readonly error = signal<string | null>(null);
 
+  readonly ownedBggIds = computed(() =>
+    new Set(this.games().map(g => g.bggId).filter((id): id is number => id != null))
+  );
+
+  isMissingBaseGame(game: Game): boolean {
+    return game.basedOnBggId != null && !this.ownedBggIds().has(game.basedOnBggId);
+  }
+
   readonly searchTerm = signal('');
   readonly searchFocused = signal(false);
   readonly suggestionHighlightIdx = signal(-1);

@@ -51,6 +51,8 @@ export interface SeedGameOptions {
   notes?: string | null;
   favorite?: boolean;
   seriesName?: string | null;
+  basedOnBggId?: number | null;
+  basedOnGameName?: string | null;
 }
 
 /** Creates a game via POST /api/games and returns its id. */
@@ -73,7 +75,9 @@ export async function seedGame(request: APIRequestContext, options: SeedGameOpti
       personalRating: options.personalRating ?? null,
       notes: options.notes ?? null,
       favorite: options.favorite ?? false,
-      seriesName: options.seriesName ?? null
+      seriesName: options.seriesName ?? null,
+      basedOnBggId: options.basedOnBggId ?? null,
+      basedOnGameName: options.basedOnGameName ?? null
     }
   });
   expect(response.ok(), `seedGame failed: ${response.status()} ${await response.text()}`).toBeTruthy();

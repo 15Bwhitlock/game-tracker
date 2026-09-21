@@ -432,6 +432,8 @@ export class GameForm implements OnInit {
       yearPublished: details.yearPublished ?? d.yearPublished,
       bestPlayerCounts: details.bestPlayerCounts.length > 0 ? details.bestPlayerCounts : d.bestPlayerCounts,
       notes: details.description ? decodeBggDescription(details.description) : d.notes,
+      basedOnBggId: details.basedOnBggId ?? d.basedOnBggId,
+      basedOnGameName: details.basedOnGameName ?? d.basedOnGameName,
     }));
     this.bggImportedHit.set({ bggId: details.bggId, name: details.title, yearPublished: details.yearPublished });
     this.bggMissingPersonalFields.set(this.computeMissingPersonalFields());

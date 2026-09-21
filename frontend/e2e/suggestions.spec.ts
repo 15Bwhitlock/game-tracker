@@ -349,6 +349,53 @@ test.describe('Suggestions page', () => {
     }
   });
 
+  test('an expansion missing its base game is never suggested, but is once the base is owned', async ({ page, request }) => {
+    // Two seed/submit round trips against a 40+ game real dev collection — same
+    // "give it more room" reasoning as the collection-page expansion tests.
+    test.setTimeout(60_000);
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const title = e2eTitle('unplayable expansion');
+    const expansionId = await seedGame(request, {
+      title,
+      minPlayers: 2,
+      maxPlayers: 4,
+      minPlayTimeMinutes: 30,
+      maxPlayTimeMinutes: 60,
+      categories: [category],
+      basedOnBggId: 999920,
+      basedOnGameName: 'Missing Base Game'
+    });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+      // The category chip itself is derived from games that pass the hard
+      // criteria — since this expansion is excluded (no base game owned yet),
+      // its one-of-a-kind category never becomes a selectable chip at all.
+      // That's the feature working correctly, not a bug in this assertion.
+      await expect(page.getByRole('button', { name: category, exact: true })).toHaveCount(0);
+      await page.getByRole('button', { name: 'Suggest' }).click();
+      await expect(page.locator('li.suggestion', { hasText: title })).not.toBeVisible();
+
+      // Now seed the base game — the expansion becomes includable, so its
+      // category chip appears too, letting this isolate to just that game.
+      // The page's already-loaded games list won't know about a game seeded
+      // directly via the API, so reload before expecting the chip to show.
+      const baseId = await seedGame(request, { title: e2eTitle('base game'), bggId: 999920 });
+      try {
+        await page.reload();
+        await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '2', exact: true }).click();
+        await page.getByRole('button', { name: category, exact: true }).click();
+        await page.getByRole('button', { name: 'Suggest' }).click();
+        await expect(page.locator('li.suggestion', { hasText: title })).toBeVisible({ timeout: 10_000 });
+      } finally {
+        await deleteGame(request, baseId);
+      }
+    } finally {
+      await deleteGame(request, expansionId);
+    }
+  });
+
   test('a game BGG marks "best" for the requested player count is ranked above one that is not', async ({ page, request }) => {
     const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
     const bestTitle = e2eTitle('best with four');

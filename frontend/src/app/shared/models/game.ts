@@ -20,6 +20,8 @@ export interface Game {
   favorite?: boolean;
   playCount?: number;
   seriesName?: string | null;
+  basedOnBggId?: number | null;
+  basedOnGameName?: string | null;
 }
 
 export function emptyGame(): Game {

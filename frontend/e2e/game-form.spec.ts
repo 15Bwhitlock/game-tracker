@@ -270,6 +270,28 @@ test.describe('Add / edit game form', () => {
     await deleteGame(request, saved.id);
   });
 
+  test('BGG import captures an expansion\'s base game reference', async ({ page, request }) => {
+    // Same skip convention as above — real BGG network call.
+    const probe = await request.get('/api/bgg/search?q=catan%20seafarers');
+    const hits = await probe.json();
+    test.skip(hits.length === 0, 'No BGG_API_TOKEN configured in this environment — see backend/.env.');
+
+    await page.goto('/games/add');
+    await page.getByPlaceholder('Search BoardGameGeek by name…').fill('catan seafarers');
+    await page.getByRole('button', { name: 'Search', exact: true }).click();
+    await page.getByRole('option', { name: /^Catan: Seafarers\s/ }).first().click();
+    await expect(page.locator('.bgg-import__confirm')).toContainText('Catan: Seafarers');
+
+    await page.getByRole('button', { name: 'Save game' }).click();
+    await expect(page).toHaveURL(/\/collection/);
+    const games = await (await request.get('/api/games')).json();
+    const saved = games.find((g: { title: string }) => g.title === 'Catan: Seafarers');
+    expect(saved).toBeTruthy();
+    expect(saved.basedOnBggId).toBe(13);
+    expect(saved.basedOnGameName).toBe('Catan');
+    await deleteGame(request, saved.id);
+  });
+
   test('BGG import confirmation nudges you toward a personal rating, but not once you\'ve already set one', async ({ page, request }) => {
     const probe = await request.get('/api/bgg/search?q=catan');
     const hits = await probe.json();

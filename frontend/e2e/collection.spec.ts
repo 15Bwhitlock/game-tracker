@@ -533,3 +533,79 @@ test.describe('Collection page bulk actions', () => {
     }
   });
 });
+
+test.describe('Expansion warning', () => {
+  test('an expansion missing its base game shows a warning badge and modal banner', async ({ page, request }) => {
+    // The real dev collection has 40+ games — opening the detail modal also
+    // kicks off a play-history fetch, so give this more headroom than the
+    // 30s default rather than the (much smaller) BGG-dependent tests' budget.
+    test.setTimeout(60_000);
+    const title = e2eTitle('Seafarers');
+    const id = await seedGame(request, {
+      title,
+      basedOnBggId: 999913,
+      basedOnGameName: 'Base Game Not Owned'
+    });
+
+    try {
+      await page.goto('/collection');
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      const tile = page.locator('.grid-tile', { has: page.getByRole('button', { name: title }) });
+      await expect(tile).toBeVisible({ timeout: 15_000 });
+      await expect(tile.locator('.expansion-badge')).toHaveClass(/tag--warning/, { timeout: 15_000 });
+      await expect(tile.locator('.expansion-badge')).toContainText('Base Game Not Owned');
+
+      await tile.getByRole('button', { name: title }).click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('.alert--error')).toContainText('Base Game Not Owned');
+      await expect(dialog.locator('.alert--error')).toContainText("isn't in your collection");
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+
+  test('an expansion whose base game is owned shows a neutral badge, no warning', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    const baseTitle = e2eTitle('Base Owned');
+    const baseId = await seedGame(request, { title: baseTitle, bggId: 999914 });
+    const expansionTitle = e2eTitle('Expansion Owned Base');
+    const expansionId = await seedGame(request, {
+      title: expansionTitle,
+      basedOnBggId: 999914,
+      basedOnGameName: baseTitle
+    });
+
+    try {
+      await page.goto('/collection');
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      const tile = page.locator('.grid-tile', { has: page.getByRole('button', { name: expansionTitle }) });
+      await expect(tile).toBeVisible({ timeout: 15_000 });
+      await expect(tile.locator('.expansion-badge')).not.toHaveClass(/tag--warning/, { timeout: 15_000 });
+      await expect(tile.locator('.expansion-badge')).toHaveText('Expansion');
+
+      await tile.getByRole('button', { name: expansionTitle }).click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('.alert--error')).toHaveCount(0);
+      await expect(dialog.locator('.expansion-note')).toContainText(`Expansion for ${baseTitle}`);
+    } finally {
+      await deleteGame(request, expansionId);
+      await deleteGame(request, baseId);
+    }
+  });
+
+  test('a non-expansion game shows no expansion badge', async ({ page, request }) => {
+    const title = e2eTitle('Not An Expansion');
+    const id = await seedGame(request, { title });
+
+    try {
+      await page.goto('/collection');
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      const tile = page.locator('.grid-tile', { has: page.getByRole('button', { name: title }) });
+      await expect(tile.locator('.expansion-badge')).toHaveCount(0);
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+});

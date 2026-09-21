@@ -121,9 +121,14 @@ export class SuggestPage implements OnInit {
   // Games that pass the hard criteria (players / time / complexity / series) — mirrors backend
   // passesHardFilters, excluding category/mechanic checks so chip availability doesn't depend
   // on selected chips. Series IS included so selecting a series narrows category/mechanic chips.
+  private readonly ownedBggIds = computed(() =>
+    new Set(this.allGames().map(g => g.bggId).filter((id): id is number => id != null))
+  );
+
   private readonly gamesMatchingHardCriteria = computed(() => {
     const d = this.draft();
     const selectedSeries = d.series?.length ? new Set(d.series.map(s => s.toLowerCase())) : null;
+    const ownedBggIds = this.ownedBggIds();
     return this.allGames().filter(g => {
       if (d.minPlayers != null && d.maxPlayers != null) {
         if (d.maxPlayers < (g.minPlayers ?? 0) || d.minPlayers > (g.maxPlayers ?? 99)) return false;
@@ -137,6 +142,7 @@ export class SuggestPage implements OnInit {
       if (d.unplayedOnly && ((g.playCount ?? 0) > 0 || g.lastPlayedAt != null)) return false;
       if (d.maxPlayCount != null && (g.playCount ?? 0) > d.maxPlayCount) return false;
       if (selectedSeries && !selectedSeries.has((g.seriesName ?? '').toLowerCase())) return false;
+      if (g.basedOnBggId != null && !ownedBggIds.has(g.basedOnBggId)) return false;
       return true;
     });
   });

@@ -551,6 +551,27 @@
   font-size: 0.8rem;
 }
 
+.tag--warning {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.expansion-badge {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.expansion-note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .play-history {
   margin: 0.35rem 0 0;
   padding-left: 1.25rem;

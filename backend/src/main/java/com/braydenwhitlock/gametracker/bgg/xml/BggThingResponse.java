@@ -25,10 +25,14 @@ import java.util.List;
  *     <maxplaytime value="120"/>
  *     <link type="boardgamecategory" id="1015" value="Negotiation"/>
  *     <link type="boardgamemechanic" id="2040" value="Dice Rolling"/>
+ *     <link type="boardgameexpansion" id="13" value="Catan" inbound="true"/>
  *     <statistics><ratings><averageweight value="2.34"/></ratings></statistics>
  *   </item>
  * </items>
  * }</pre>
+ * The {@code inbound="true"} attribute only appears on an expansion's own {@code /thing}
+ * response, on the single link pointing back at its base game — a base game's forward
+ * links to its own expansions never carry it. See {@code BggClient.expansionBaseLink}.
  */
 @JacksonXmlRootElement(localName = "items")
 @JsonIgnoreProperties(ignoreUnknown = true)
@@ -153,12 +157,26 @@ public class BggThingResponse {
         private String type;
 
         @JacksonXmlProperty(isAttribute = true)
+        private Integer id;
+
+        @JacksonXmlProperty(isAttribute = true)
         private String value;
+
+        // Present (and "true") only on a link that points *back* at a base item —
+        // e.g. an expansion's own boardgameexpansion link to its base game. BGG
+        // omits the attribute entirely on forward links (a base game listing the
+        // expansions built on top of it), so this is null/false for those.
+        @JacksonXmlProperty(isAttribute = true)
+        private Boolean inbound;
 
         public String getType() { return type; }
         public void setType(String type) { this.type = type; }
+        public Integer getId() { return id; }
+        public void setId(Integer id) { this.id = id; }
         public String getValue() { return value; }
         public void setValue(String value) { this.value = value; }
+        public Boolean getInbound() { return inbound; }
+        public void setInbound(Boolean inbound) { this.inbound = inbound; }
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

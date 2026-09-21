@@ -21,4 +21,6 @@ export interface BggGameDetails {
   categories: string[];
   mechanics: string[];
   bestPlayerCounts: number[];
+  basedOnBggId: number | null;
+  basedOnGameName: string | null;
 }

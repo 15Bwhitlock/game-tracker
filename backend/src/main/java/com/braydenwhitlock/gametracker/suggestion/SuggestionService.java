@@ -13,7 +13,9 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Suggests games from the user's collection that fit a set of criteria.
@@ -65,8 +67,15 @@ public class SuggestionService {
         LocalDate today = LocalDate.now(clock);
         int page = criteria.page() != null ? criteria.page() : 0;
 
-        List<ScoredGame> all = gameRepository.findAll().stream()
-                .filter(game -> passesHardFilters(game, criteria))
+        List<Game> allGames = gameRepository.findAll();
+        // Needed so an expansion missing its base game can be excluded — see passesHardFilters.
+        Set<Integer> ownedBggIds = allGames.stream()
+                .map(Game::getBggId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<ScoredGame> all = allGames.stream()
+                .filter(game -> passesHardFilters(game, criteria, ownedBggIds))
                 .map(game -> score(game, today, criteria))
                 .sorted(byScoreThenRatingThenTitle())
                 .toList();
@@ -79,7 +88,7 @@ public class SuggestionService {
         return new SuggestionPage(items, page, PAGE_SIZE, all.size());
     }
 
-    private static boolean passesHardFilters(Game game, SuggestionCriteria c) {
+    private static boolean passesHardFilters(Game game, SuggestionCriteria c, Set<Integer> ownedBggIds) {
         int reqMin = c.minPlayers();
         int reqMax = c.maxPlayers() != null ? c.maxPlayers() : reqMin;
         // requested range must overlap the game's supported player count range
@@ -118,6 +127,10 @@ public class SuggestionService {
             return false;
         }
         if (c.minRating() != null && (game.getPersonalRating() == null || game.getPersonalRating() < c.minRating())) {
+            return false;
+        }
+        // Can't actually be played without its base game.
+        if (game.getBasedOnBggId() != null && !ownedBggIds.contains(game.getBasedOnBggId())) {
             return false;
         }
         return true;
