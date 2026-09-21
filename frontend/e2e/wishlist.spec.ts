@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { deleteAllE2eWishlistItems, deleteWishlistItem, e2eTitle, seedWishlistItem } from './support/api';
+import { deleteAllE2eWishlistItems, deleteGame, deleteWishlistItem, e2eTitle, seedGame, seedWishlistItem } from './support/api';
 
 test.describe('Wishlist page', () => {
   test.afterEach(async ({ request }) => {
@@ -323,5 +323,78 @@ test.describe('Wishlist page', () => {
     await expect(async () => {
       expect(await tiles.count()).toBeGreaterThan(initialCount);
     }).toPass({ timeout: 5_000 });
+  });
+});
+
+test.describe('Expansion warning on the Wishlist page', () => {
+  test.afterEach(async ({ request }) => {
+    await deleteAllE2eWishlistItems(request);
+  });
+
+  test('a wishlist item that is an expansion missing its base game shows a warning badge and modal banner', async ({ page, request }) => {
+    const title = e2eTitle('Seafarers');
+    const id = await seedWishlistItem(request, {
+      title,
+      basedOnBggId: 999930,
+      basedOnGameName: 'Base Game Not Owned'
+    });
+
+    try {
+      await page.goto('/wishlist');
+      const tile = page.locator('.wishlist-tile', { hasText: title });
+      await expect(tile).toBeVisible();
+      await expect(tile.locator('.expansion-badge')).toHaveClass(/tag--warning/);
+      await expect(tile.locator('.expansion-badge')).toContainText('Base Game Not Owned');
+
+      await tile.locator('.title-btn').click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('.alert--error')).toContainText('Base Game Not Owned');
+      await expect(dialog.locator('.alert--error')).toContainText("isn't in your collection");
+    } finally {
+      await deleteWishlistItem(request, id);
+    }
+  });
+
+  test('a wishlist item that is an expansion whose base game is owned shows a neutral badge, no warning', async ({ page, request }) => {
+    const baseTitle = e2eTitle('Base Owned');
+    const baseId = await seedGame(request, { title: baseTitle, bggId: 999931 });
+    const expansionTitle = e2eTitle('Expansion Owned Base');
+    const wishlistId = await seedWishlistItem(request, {
+      title: expansionTitle,
+      basedOnBggId: 999931,
+      basedOnGameName: baseTitle
+    });
+
+    try {
+      await page.goto('/wishlist');
+      const tile = page.locator('.wishlist-tile', { hasText: expansionTitle });
+      await expect(tile).toBeVisible();
+      await expect(tile.locator('.expansion-badge')).not.toHaveClass(/tag--warning/);
+      await expect(tile.locator('.expansion-badge')).toHaveText('Expansion');
+
+      await tile.locator('.title-btn').click();
+      const dialog = page.locator('dialog.modal--detail');
+      await expect(dialog).toBeVisible();
+      await expect(dialog.locator('.alert--error')).toHaveCount(0);
+      await expect(dialog.locator('.expansion-note')).toContainText(`Expansion for ${baseTitle}`);
+    } finally {
+      await deleteWishlistItem(request, wishlistId);
+      await deleteGame(request, baseId);
+    }
+  });
+
+  test('a plain wishlist item shows no expansion badge', async ({ page, request }) => {
+    const title = e2eTitle('Not An Expansion');
+    const id = await seedWishlistItem(request, { title });
+
+    try {
+      await page.goto('/wishlist');
+      const tile = page.locator('.wishlist-tile', { hasText: title });
+      await expect(tile).toBeVisible();
+      await expect(tile.locator('.expansion-badge')).toHaveCount(0);
+    } finally {
+      await deleteWishlistItem(request, id);
+    }
   });
 });

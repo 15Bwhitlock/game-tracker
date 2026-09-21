@@ -99,6 +99,8 @@ class WishlistServiceTest {
         item.setImageUrl("full.jpg");
         item.setYearPublished(2017);
         item.setNotes("Recommended by a friend");
+        item.setBasedOnBggId(13);
+        item.setBasedOnGameName("Catan");
         when(wishlistRepo.findById(1L)).thenReturn(Optional.of(item));
         when(gameRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -115,6 +117,8 @@ class WishlistServiceTest {
         assertThat(saved.getMechanics()).containsExactly("Hand Management");
         assertThat(saved.getNotes()).isEqualTo("Recommended by a friend");
         assertThat(saved.getOwnedSince()).isEqualTo(LocalDate.now());
+        assertThat(saved.getBasedOnBggId()).isEqualTo(13);
+        assertThat(saved.getBasedOnGameName()).isEqualTo("Catan");
         verify(wishlistRepo).deleteById(1L);
     }
 

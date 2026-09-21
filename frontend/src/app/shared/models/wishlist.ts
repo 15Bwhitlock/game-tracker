@@ -15,6 +15,8 @@ export interface Wishlist {
   mechanics: string[];
   notes?: string | null;
   addedAt?: string | null;
+  basedOnBggId?: number | null;
+  basedOnGameName?: string | null;
 }
 
 export function emptyWishlistItem(): Wishlist {

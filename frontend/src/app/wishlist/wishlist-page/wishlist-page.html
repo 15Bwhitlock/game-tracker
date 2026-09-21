@@ -143,6 +143,13 @@
                     <span class="muted">({{ card.yearPublished }})</span>
                   }
                 </h3>
+                @if (card.basedOnBggId != null) {
+                  <span
+                    class="tag expansion-badge"
+                    [class.tag--warning]="isMissingBaseGame(card)"
+                    [title]="isMissingBaseGame(card) ? 'Requires ' + card.basedOnGameName + ', which isn\'t in your collection' : 'Expansion for ' + card.basedOnGameName"
+                  >{{ isMissingBaseGame(card) ? '⚠ Requires ' + card.basedOnGameName : 'Expansion' }}</span>
+                }
                 @if (card.categories.length || card.mechanics.length) {
                   <div class="wishlist-tile__tags">
                     @for (cat of card.categories.slice(0, 3); track cat) {
@@ -198,6 +205,13 @@
                     <span class="muted">({{ card.yearPublished }})</span>
                   }
                 </h3>
+                @if (card.basedOnBggId != null) {
+                  <span
+                    class="tag expansion-badge"
+                    [class.tag--warning]="isMissingBaseGame(card)"
+                    [title]="isMissingBaseGame(card) ? 'Requires ' + card.basedOnGameName + ', which isn\'t in your collection' : 'Expansion for ' + card.basedOnGameName"
+                  >{{ isMissingBaseGame(card) ? '⚠ Requires ' + card.basedOnGameName : 'Expansion' }}</span>
+                }
                 @if (card.categories.length || card.mechanics.length) {
                   <div class="wishlist-tile__tags">
                     @for (cat of card.categories.slice(0, 3); track cat) {
@@ -288,6 +302,16 @@
             <span class="detail-value">{{ card.complexityWeight != null ? (card.complexityWeight | number:'1.1-2') + ' / 5' : '—' }}</span>
           </div>
         </div>
+
+        @if (card.basedOnBggId != null) {
+          @if (isMissingBaseGame(card)) {
+            <div class="alert alert--error" role="alert">
+              Requires <strong>{{ card.basedOnGameName }}</strong>, which isn't in your collection.
+            </div>
+          } @else {
+            <p class="muted expansion-note">Expansion for {{ card.basedOnGameName }}</p>
+          }
+        }
 
         @if (card.categories.length) {
           <div class="detail-section">

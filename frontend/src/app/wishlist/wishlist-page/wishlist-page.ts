@@ -27,6 +27,8 @@ interface WishlistCard {
   notes?: string | null;
   description?: string | null; // BGG's own blurb — only set pre-add (see cardFromDetails);
                                 // once on the wishlist it lives on as the (editable) notes instead
+  basedOnBggId?: number | null;
+  basedOnGameName?: string | null;
   wishlistId?: number; // present only for "mine" cards — needed for remove/move actions
   trendingSource?: BggGameDetails; // present only for "trending" cards — needed to add
 }
@@ -48,6 +50,8 @@ function cardFromDetails(details: BggGameDetails): WishlistCard {
     categories: details.categories,
     mechanics: details.mechanics,
     description: details.description ? decodeBggDescription(details.description) : null,
+    basedOnBggId: details.basedOnBggId,
+    basedOnGameName: details.basedOnGameName,
     trendingSource: details
   };
 }
@@ -79,6 +83,10 @@ export class WishlistPage implements OnInit {
   readonly wishlistBggIds = computed(() =>
     new Set(this.wishlist().map(w => w.bggId).filter((id): id is number => id != null))
   );
+
+  isMissingBaseGame(card: WishlistCard): boolean {
+    return card.basedOnBggId != null && !this.ownedBggIds().has(card.basedOnBggId);
+  }
 
   // Search-by-name — independent of which tab is active, mirrors GameForm's BGG import UI.
   readonly searchQuery = signal('');
@@ -123,6 +131,8 @@ export class WishlistPage implements OnInit {
           categories: w.categories,
           mechanics: w.mechanics,
           notes: w.notes,
+          basedOnBggId: w.basedOnBggId ?? null,
+          basedOnGameName: w.basedOnGameName ?? null,
           wishlistId: w.id
         }))
       : this.trending().map(g => cardFromDetails(g))
@@ -346,7 +356,9 @@ export class WishlistPage implements OnInit {
       complexityWeight: details.complexityWeight,
       categories: details.categories,
       mechanics: details.mechanics,
-      notes: details.description ? decodeBggDescription(details.description) : null
+      notes: details.description ? decodeBggDescription(details.description) : null,
+      basedOnBggId: details.basedOnBggId,
+      basedOnGameName: details.basedOnGameName
     };
     this.wishlistApi.add(item).subscribe({
       next: saved => {

@@ -115,6 +115,8 @@ export interface SeedWishlistOptions {
   complexityWeight?: number | null;
   thumbnailUrl?: string | null;
   imageUrl?: string | null;
+  basedOnBggId?: number | null;
+  basedOnGameName?: string | null;
 }
 
 /** Creates a wishlist item via POST /api/wishlist and returns its id. */
@@ -132,7 +134,9 @@ export async function seedWishlistItem(request: APIRequestContext, options: Seed
       maxPlayTimeMinutes: options.maxPlayTimeMinutes ?? null,
       complexityWeight: options.complexityWeight ?? null,
       thumbnailUrl: options.thumbnailUrl ?? null,
-      imageUrl: options.imageUrl ?? null
+      imageUrl: options.imageUrl ?? null,
+      basedOnBggId: options.basedOnBggId ?? null,
+      basedOnGameName: options.basedOnGameName ?? null
     }
   });
   expect(response.ok(), `seedWishlistItem failed: ${response.status()} ${await response.text()}`).toBeTruthy();
