@@ -324,6 +324,19 @@
           </div>
         </div>
 
+        <div class="field field--wide">
+          <span>
+            Owned Since
+            <span class="field__optional">optional</span>
+          </span>
+          <input
+            type="date"
+            name="ownedSince"
+            [ngModel]="draft().ownedSince"
+            (ngModelChange)="draft.update(d => ({ ...d, ownedSince: $event || null }))"
+          />
+        </div>
+
         @if (editId()) {
           <div class="field field--wide">
             <span>
