@@ -296,6 +296,7 @@ public class BggClient {
             return Optional.empty();
         }
         BggThingResponse.Item item = parsed.getItems().get(0);
+        BggThingResponse.Link expansionBase = expansionBaseLink(item.getLinks());
         return Optional.of(new BggGameDetails(
                 item.getId() != null ? item.getId() : 0,
                 primaryName(item.getNames()),
@@ -310,7 +311,9 @@ public class BggClient {
                 averageWeight(item),
                 linkValues(item.getLinks(), "boardgamecategory"),
                 linkValues(item.getLinks(), "boardgamemechanic"),
-                bestPlayerCounts(item)));
+                bestPlayerCounts(item),
+                expansionBase != null ? expansionBase.getId() : null,
+                expansionBase != null ? expansionBase.getValue() : null));
     }
 
     /**
@@ -370,6 +373,22 @@ public class BggClient {
             }
         }
         return out;
+    }
+
+    // An expansion's /thing response lists both the things that expand IT (forward
+    // boardgameexpansion links, no "inbound" attribute) and, exactly once, the base game
+    // it itself expands — the one boardgameexpansion link BGG marks inbound="true".
+    // Package-private so tests can drive it directly with a parsed fixture.
+    static BggThingResponse.Link expansionBaseLink(List<BggThingResponse.Link> links) {
+        if (links == null) {
+            return null;
+        }
+        for (BggThingResponse.Link link : links) {
+            if ("boardgameexpansion".equalsIgnoreCase(link.getType()) && Boolean.TRUE.equals(link.getInbound())) {
+                return link;
+            }
+        }
+        return null;
     }
 
     private static Double averageWeight(BggThingResponse.Item item) {

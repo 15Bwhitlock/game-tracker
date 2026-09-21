@@ -199,6 +199,13 @@
             >{{ game.favorite ? '★' : '☆' }}</button>
             <div class="grid-tile__body">
               <button type="button" class="title-btn grid-tile__title" (click)="openDetail(game)">{{ game.title }}</button>
+              @if (game.basedOnBggId != null) {
+                <span
+                  class="tag expansion-badge"
+                  [class.tag--warning]="isMissingBaseGame(game)"
+                  [title]="isMissingBaseGame(game) ? 'Requires ' + game.basedOnGameName + ', which isn\'t in your collection' : 'Expansion for ' + game.basedOnGameName"
+                >{{ isMissingBaseGame(game) ? '⚠ Requires ' + game.basedOnGameName : 'Expansion' }}</span>
+              }
               <p class="grid-tile__meta muted">
                 @if (game.minPlayers === game.maxPlayers) {
                   {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
@@ -274,6 +281,13 @@
                 @if (game.yearPublished) {
                   <span class="title-year">({{ game.yearPublished }})</span>
                 }
+                @if (game.basedOnBggId != null) {
+                  <span
+                    class="tag expansion-badge"
+                    [class.tag--warning]="isMissingBaseGame(game)"
+                    [title]="isMissingBaseGame(game) ? 'Requires ' + game.basedOnGameName + ', which isn\'t in your collection' : 'Expansion for ' + game.basedOnGameName"
+                  >{{ isMissingBaseGame(game) ? '⚠ Requires ' + game.basedOnGameName : 'Expansion' }}</span>
+                }
               </td>
               <td>
                 @if (game.minPlayers === game.maxPlayers) {
@@ -333,6 +347,16 @@
             <button type="button" class="modal__close" aria-label="Close" (click)="closeDetail()">×</button>
           </div>
         </header>
+
+        @if (game.basedOnBggId != null) {
+          @if (isMissingBaseGame(game)) {
+            <div class="alert alert--error" role="alert">
+              Requires <strong>{{ game.basedOnGameName }}</strong>, which isn't in your collection.
+            </div>
+          } @else {
+            <p class="muted expansion-note">Expansion for {{ game.basedOnGameName }}</p>
+          }
+        }
 
         @if (game.imageUrl || game.thumbnailUrl) {
           <img class="detail-image" [src]="game.imageUrl || game.thumbnailUrl" alt="" />

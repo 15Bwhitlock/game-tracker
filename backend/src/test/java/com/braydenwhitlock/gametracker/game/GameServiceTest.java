@@ -78,6 +78,8 @@ class GameServiceTest {
         updates.setNotes("Great game");
         updates.setMinPlayers(3);
         updates.setMaxPlayers(6);
+        updates.setBasedOnBggId(13);
+        updates.setBasedOnGameName("Catan");
 
         Game result = service.update(1L, updates);
 
@@ -86,6 +88,8 @@ class GameServiceTest {
         assertThat(result.getNotes()).isEqualTo("Great game");
         assertThat(result.getMinPlayers()).isEqualTo(3);
         assertThat(result.getMaxPlayers()).isEqualTo(6);
+        assertThat(result.getBasedOnBggId()).isEqualTo(13);
+        assertThat(result.getBasedOnGameName()).isEqualTo("Catan");
     }
 
     @Test

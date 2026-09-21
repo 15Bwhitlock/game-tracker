@@ -96,6 +96,25 @@ class BggClientParseTest {
     }
 
     @Test
+    void baseGameHasNoExpansionReference() throws IOException {
+        BggGameDetails details = BggClient.parseThingXml(load("bgg/thing-13.xml")).orElseThrow();
+        assertThat(details.basedOnBggId()).isNull();
+        assertThat(details.basedOnGameName()).isNull();
+    }
+
+    @Test
+    void expansionCapturesItsInboundBaseGameLinkButNotForwardExpansionLinks() throws IOException {
+        BggGameDetails details = BggClient.parseThingXml(load("bgg/thing-expansion.xml")).orElseThrow();
+
+        assertThat(details.basedOnBggId()).isEqualTo(13);
+        assertThat(details.basedOnGameName()).isEqualTo("Catan");
+        // Forward boardgameexpansion links (things that expand THIS item) must never be
+        // mistaken for the base-game reference just because they share a link type.
+        assertThat(details.basedOnBggId()).isNotEqualTo(4103);
+        assertThat(details.basedOnBggId()).isNotEqualTo(223171);
+    }
+
+    @Test
     void unknownThingIdReturnsEmpty() throws IOException {
         Optional<BggGameDetails> result = BggClient.parseThingXml(load("bgg/thing-unknown.xml"));
         assertThat(result).isEmpty();

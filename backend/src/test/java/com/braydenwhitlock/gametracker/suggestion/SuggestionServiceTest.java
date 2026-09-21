@@ -185,6 +185,29 @@ class SuggestionServiceTest {
                 .containsExactlyInAnyOrder("Fluxx", "Cthulhu Fluxx");
     }
 
+    @Test
+    void excludesAnExpansionWhoseBaseGameIsntOwned() {
+        Game seafarers = game("Catan: Seafarers", 3, 4, 90, 120, null, null, null);
+        seafarers.setBasedOnBggId(13);
+        seafarers.setBasedOnGameName("Catan");
+        stub(seafarers);
+
+        assertThat(suggest(3)).isEmpty();
+    }
+
+    @Test
+    void includesAnExpansionWhenItsBaseGameIsOwned() {
+        Game catan = game("Catan", 3, 4, 60, 120, null, null, null);
+        catan.setBggId(13);
+        Game seafarers = game("Catan: Seafarers", 3, 4, 90, 120, null, null, null);
+        seafarers.setBasedOnBggId(13);
+        seafarers.setBasedOnGameName("Catan");
+        stub(catan, seafarers);
+
+        assertThat(suggest(3)).extracting(sg -> sg.game().getTitle())
+                .containsExactlyInAnyOrder("Catan", "Catan: Seafarers");
+    }
+
     // -------- scoring --------
 
     @Test

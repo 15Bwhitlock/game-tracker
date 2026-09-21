@@ -128,6 +128,15 @@ public class Game {
     @Column(name = "series_name")
     private String seriesName;
 
+    // BGG id/name of the base game this is an expansion for, from the BGG import — null for
+    // a base game (or a manually-added one with no BGG data). Used to warn when an owned
+    // expansion's base game isn't also owned.
+    @Column(name = "based_on_bgg_id")
+    private Integer basedOnBggId;
+
+    @Column(name = "based_on_game_name")
+    private String basedOnGameName;
+
     @Formula("(SELECT COUNT(*) FROM game_plays gp WHERE gp.game_id = id)")
     private int playCount;
 
@@ -193,6 +202,12 @@ public class Game {
 
     public String getSeriesName() { return seriesName; }
     public void setSeriesName(String seriesName) { this.seriesName = seriesName; }
+
+    public Integer getBasedOnBggId() { return basedOnBggId; }
+    public void setBasedOnBggId(Integer basedOnBggId) { this.basedOnBggId = basedOnBggId; }
+
+    public String getBasedOnGameName() { return basedOnGameName; }
+    public void setBasedOnGameName(String basedOnGameName) { this.basedOnGameName = basedOnGameName; }
 
     // Cross-field checks Bean Validation can't express with per-field annotations alone.
     // @Transient + @JsonIgnore keep these out of the JPA mapping and the JSON response —

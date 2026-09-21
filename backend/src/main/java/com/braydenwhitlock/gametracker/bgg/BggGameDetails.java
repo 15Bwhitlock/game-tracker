@@ -20,6 +20,10 @@ import java.util.List;
  * @param mechanics           BGG mechanic names (e.g. "Deck Building")
  * @param bestPlayerCounts    player counts the BGG community's poll marks as "Best"
  *                            (e.g. [4] or [3, 4]); empty if BGG has no such poll data yet
+ * @param basedOnBggId        BGG id of the base game this is an expansion for, from the
+ *                            inbound {@code boardgameexpansion} link; null if this isn't
+ *                            an expansion (or BGG has no such link for it)
+ * @param basedOnGameName     the base game's name, alongside {@code basedOnBggId}
  */
 public record BggGameDetails(
         int bggId,
@@ -35,4 +39,6 @@ public record BggGameDetails(
         Double complexityWeight,
         List<String> categories,
         List<String> mechanics,
-        List<Integer> bestPlayerCounts) {}
+        List<Integer> bestPlayerCounts,
+        Integer basedOnBggId,
+        String basedOnGameName) {}

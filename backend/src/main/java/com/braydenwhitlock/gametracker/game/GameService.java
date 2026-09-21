@@ -87,6 +87,8 @@ public class GameService {
         existing.setNotes(updates.getNotes());
         existing.setLastPlayedAt(updates.getLastPlayedAt());
         existing.setSeriesName(updates.getSeriesName());
+        existing.setBasedOnBggId(updates.getBasedOnBggId());
+        existing.setBasedOnGameName(updates.getBasedOnGameName());
         // JPA dirty-checking detects the changed fields and issues an UPDATE
         // automatically when the transaction commits — no explicit save() needed here.
         return existing;
