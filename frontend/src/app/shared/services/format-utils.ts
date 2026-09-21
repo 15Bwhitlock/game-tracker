@@ -1,3 +1,5 @@
+import { PLAYERS_UNLIMITED } from '../models/game-constants';
+
 export function formatTime(minutes: number | null): string {
   if (minutes === null || minutes <= 0) return '';
   const h = Math.floor(minutes / 60);
@@ -25,4 +27,12 @@ export function decodeBggDescription(raw: string): string {
   const el = document.createElement('textarea');
   el.innerHTML = withBreaks;
   return el.value.replace(/<[^>]+>/g, '').trim();
+}
+
+// "1 player", "4 players", "2–4 players", "10+ players" — singular only for exactly one.
+export function formatPlayers(min: number | null | undefined, max: number | null | undefined): string {
+  if (min == null || max == null) return '';
+  const top = max === PLAYERS_UNLIMITED ? '10+' : String(max);
+  if (min === max) return `${top} ${max === 1 ? 'player' : 'players'}`;
+  return `${min}–${top} players`;
 }

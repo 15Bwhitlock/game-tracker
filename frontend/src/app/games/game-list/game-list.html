@@ -207,12 +207,7 @@
                 >{{ isMissingBaseGame(game) ? '⚠ Requires ' + game.basedOnGameName : 'Expansion' }}</span>
               }
               <p class="grid-tile__meta muted">
-                @if (game.minPlayers === game.maxPlayers) {
-                  {{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.minPlayers }}
-                } @else {
-                  {{ game.minPlayers }}–{{ game.maxPlayers === PLAYERS_UNLIMITED ? '10+' : game.maxPlayers }}
-                }
-                players
+                {{ formatPlayers(game.minPlayers, game.maxPlayers) }}
                 @if (game.personalRating != null) {
                   <span class="dot">·</span>{{ game.personalRating }}/10
                 }

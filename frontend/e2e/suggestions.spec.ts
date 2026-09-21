@@ -396,6 +396,27 @@ test.describe('Suggestions page', () => {
     }
   });
 
+  test('a solo-only game reads "1 player" in the results, not "1–1 players"', async ({ page, request }) => {
+    const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
+    const title = e2eTitle('solo result');
+    const id = await seedGame(request, { title, minPlayers: 1, maxPlayers: 1, categories: [category] });
+
+    try {
+      await page.goto('/suggest');
+      await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '1', exact: true }).click();
+      await page.getByRole('button', { name: category, exact: true }).click();
+      await page.getByRole('button', { name: 'Suggest' }).click();
+
+      const result = page.locator('li.suggestion', { hasText: title });
+      await expect(result).toBeVisible({ timeout: 10_000 });
+      await expect(result).toContainText('1 player');
+      await expect(result).not.toContainText('1–1');
+      await expect(result).not.toContainText('1 players');
+    } finally {
+      await deleteGame(request, id);
+    }
+  });
+
   test('a game BGG marks "best" for the requested player count is ranked above one that is not', async ({ page, request }) => {
     const category = `ZZZ_E2E_${Math.random().toString(36).slice(2, 8)}`;
     const bestTitle = e2eTitle('best with four');

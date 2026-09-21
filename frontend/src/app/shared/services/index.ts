@@ -3,4 +3,4 @@ export { ToastService } from './toast.service';
 export type { Toast } from './toast.service';
 export { ToastComponent } from './toast.component';
 export { describeHttpError } from './http-error';
-export { formatTime, formatDate, decodeBggDescription } from './format-utils';
+export { formatTime, formatDate, formatPlayers, decodeBggDescription } from './format-utils';

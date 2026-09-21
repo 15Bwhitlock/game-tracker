@@ -3,7 +3,7 @@ import { Component, ElementRef, OnInit, computed, effect, inject, signal, untrac
 import { RouterLink } from '@angular/router';
 
 import { SuggestionApi, GameApi, GamePlay } from '@shared/api';
-import { ToastService, describeHttpError, formatTime, formatDate } from '@shared/services';
+import { ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
 import { Game, ScoredGame, SuggestionCriteria, SuggestionPage, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
 
 @Component({
@@ -304,6 +304,7 @@ export class SuggestPage implements OnInit {
 
   readonly formatDate = formatDate;
   readonly formatTime = formatTime;
+  readonly formatPlayers = formatPlayers;
 
   isPlayerSelected(n: number): boolean {
     return n === this.draft().minPlayers;

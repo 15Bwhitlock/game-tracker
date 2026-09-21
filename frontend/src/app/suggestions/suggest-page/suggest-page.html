@@ -270,7 +270,7 @@
               <div class="suggest-tile__body">
                 <button type="button" class="title-btn suggest-tile__title" (click)="openDetail(sg.game)">{{ sg.game.title }}</button>
                 <p class="suggest-tile__meta muted">
-                  {{ sg.game.minPlayers }}–{{ sg.game.maxPlayers }} players
+                  {{ formatPlayers(sg.game.minPlayers, sg.game.maxPlayers) }}
                   @if (sg.game.personalRating != null) {
                     <span class="dot">·</span>{{ sg.game.personalRating }}/10
                   }
@@ -309,7 +309,7 @@
                   <span class="suggestion__score" title="Suggestion score">{{ sg.score | number:'1.1-1' }}</span>
                 </div>
                 <div class="suggestion__meta muted">
-                  {{ sg.game.minPlayers }}–{{ sg.game.maxPlayers }} players ·
+                  {{ formatPlayers(sg.game.minPlayers, sg.game.maxPlayers) }} ·
                   {{ sg.game.minPlayTimeMinutes }}–{{ sg.game.maxPlayTimeMinutes }} min
                   @if (sg.game.complexityWeight != null) {
                     · weight {{ sg.game.complexityWeight | number:'1.1-2' }}
