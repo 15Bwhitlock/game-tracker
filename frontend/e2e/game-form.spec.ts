@@ -22,6 +22,40 @@ test.describe('Add / edit game form', () => {
     await expect(page.getByRole('button', { name: title })).toBeVisible();
   });
 
+  test('Owned Since can be set when adding a game, and edited afterward', async ({ page, request }) => {
+    // Add, view, edit, and save again — several round trips in one test.
+    test.setTimeout(60_000);
+    const title = e2eTitle('owned since flow');
+
+    await page.goto('/games/add');
+    await page.getByPlaceholder('Game Title').fill(title);
+    await page.getByRole('group', { name: 'Player count' }).getByRole('button', { name: '3', exact: true }).click();
+    await page.getByRole('group', { name: 'Play time' }).getByRole('button', { name: '45m', exact: true }).click();
+    await page.locator('input[name="ownedSince"]').fill('2024-06-15');
+    await page.getByRole('button', { name: 'Save game' }).click();
+
+    await expect(page).toHaveURL(/\/collection/);
+    let games = await (await request.get('/api/games')).json();
+    let saved = games.find((g: { title: string }) => g.title === title);
+    expect(saved.ownedSince).toBe('2024-06-15');
+
+    // The detail modal reflects it too, not just the raw API response.
+    await page.getByRole('button', { name: title }).click();
+    await expect(page.locator('.detail-item', { hasText: 'Owned Since' })).toContainText('15 Jun 2024');
+
+    // Editable afterward, same as any other field — the modal's own Edit link
+    // navigates straight there (and closes the modal itself on click).
+    await page.getByRole('link', { name: 'Edit' }).click();
+    await expect(page.locator('input[name="ownedSince"]')).toHaveValue('2024-06-15');
+    await page.locator('input[name="ownedSince"]').fill('2025-01-01');
+    await page.getByRole('button', { name: 'Save changes' }).click();
+
+    await expect(page).toHaveURL(/\/collection/);
+    games = await (await request.get('/api/games')).json();
+    saved = games.find((g: { title: string }) => g.title === title);
+    expect(saved.ownedSince).toBe('2025-01-01');
+  });
+
   test('shows a validation error when player count is missing', async ({ page }) => {
     await page.goto('/games/add');
     await page.getByPlaceholder('Game Title').fill(e2eTitle('missing players'));
