@@ -84,6 +84,14 @@ public class Wishlist {
     @Column(name = "added_at", nullable = false)
     private LocalDate addedAt;
 
+    // BGG id/name of the base game this is an expansion for — same purpose as
+    // Game.basedOnBggId/basedOnGameName, set once at creation from the BGG lookup.
+    @Column(name = "based_on_bgg_id")
+    private Integer basedOnBggId;
+
+    @Column(name = "based_on_game_name")
+    private String basedOnGameName;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -128,4 +136,10 @@ public class Wishlist {
 
     public LocalDate getAddedAt() { return addedAt; }
     public void setAddedAt(LocalDate addedAt) { this.addedAt = addedAt; }
+
+    public Integer getBasedOnBggId() { return basedOnBggId; }
+    public void setBasedOnBggId(Integer basedOnBggId) { this.basedOnBggId = basedOnBggId; }
+
+    public String getBasedOnGameName() { return basedOnGameName; }
+    public void setBasedOnGameName(String basedOnGameName) { this.basedOnGameName = basedOnGameName; }
 }

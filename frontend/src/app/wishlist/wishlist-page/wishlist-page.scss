@@ -298,6 +298,27 @@
   border: 1px solid var(--accent-dim-strong);
 }
 
+.tag--warning {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border-color: var(--error-border);
+}
+
+.expansion-badge {
+  align-self: flex-start;
+  font-size: 0.72rem;
+  padding: 0.1rem 0.5rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.expansion-note {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
 .wishlist-tile__actions {
   margin-top: auto;
   display: flex;

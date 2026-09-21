@@ -80,6 +80,8 @@ public class WishlistService {
         game.setYearPublished(item.getYearPublished());
         game.setNotes(item.getNotes());
         game.setOwnedSince(LocalDate.now());
+        game.setBasedOnBggId(item.getBasedOnBggId());
+        game.setBasedOnGameName(item.getBasedOnGameName());
 
         Game saved = gameRepository.save(game);
         wishlistRepository.deleteById(id);
