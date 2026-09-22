@@ -5,7 +5,7 @@ import { forkJoin } from 'rxjs';
 
 import { GameApi, GamePlay } from '@shared/api';
 import { Game, PLAYERS_UNLIMITED, TIME_UNLIMITED } from '@shared/models';
-import { ToastService, describeHttpError, formatTime, formatDate } from '@shared/services';
+import { ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
 
 @Component({
   selector: 'app-game-list',
@@ -195,6 +195,7 @@ export class GameList implements OnInit {
 
   readonly formatDate = formatDate;
   readonly formatTime = formatTime;
+  readonly formatPlayers = formatPlayers;
 
   toggleFavorite(game: Game): void {
     if (!game.id) return;

@@ -609,3 +609,28 @@ test.describe('Expansion warning', () => {
     }
   });
 });
+
+test.describe('Player count wording', () => {
+  test('a solo-only game reads "1 player" in grid view, not "1–1 players" or "1 players"', async ({ page, request }) => {
+    test.setTimeout(60_000);
+    const solo = e2eTitle('Solo Only');
+    const range = e2eTitle('Two To Four');
+    const soloId = await seedGame(request, { title: solo, minPlayers: 1, maxPlayers: 1 });
+    const rangeId = await seedGame(request, { title: range, minPlayers: 2, maxPlayers: 4 });
+
+    try {
+      await page.goto('/collection');
+      await page.locator('.view-toggle__btn[title="Grid view"]').click();
+      const soloMeta = page.locator('.grid-tile', { has: page.getByRole('button', { name: solo }) }).locator('.grid-tile__meta');
+      await expect(soloMeta).toContainText('1 player', { timeout: 15_000 });
+      await expect(soloMeta).not.toContainText('1 players');
+      await expect(soloMeta).not.toContainText('1–1');
+
+      const rangeMeta = page.locator('.grid-tile', { has: page.getByRole('button', { name: range }) }).locator('.grid-tile__meta');
+      await expect(rangeMeta).toContainText('2–4 players');
+    } finally {
+      await deleteGame(request, soloId);
+      await deleteGame(request, rangeId);
+    }
+  });
+});
