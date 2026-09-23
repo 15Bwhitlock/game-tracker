@@ -7,6 +7,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.time.Instant;
+
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -41,5 +43,18 @@ class AppSettingsControllerTest {
                         .content("{\"aiEnabled\":false}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.aiEnabled").value(false));
+    }
+
+    @Test
+    void postDictionaryViewedReturnsTheUpdatedTimestamp() throws Exception {
+        AppSettings updated = new AppSettings();
+        updated.setId(1L);
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        updated.setDictionaryLastViewedAt(now);
+        when(service.markDictionaryViewed()).thenReturn(updated);
+
+        mvc.perform(post("/api/settings/dictionary-viewed"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.dictionaryLastViewedAt").value("2026-01-01T00:00:00Z"));
     }
 }

@@ -17,4 +17,8 @@ export class AppSettingsApi {
   updateAiEnabled(aiEnabled: boolean): Observable<AppSettings> {
     return this.http.patch<AppSettings>(this.baseUrl, { aiEnabled });
   }
+
+  markDictionaryViewed(): Observable<AppSettings> {
+    return this.http.post<AppSettings>(`${this.baseUrl}/dictionary-viewed`, {});
+  }
 }

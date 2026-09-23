@@ -157,12 +157,17 @@
       <div class="entry-list">
         @for (t of filteredLearnedTags(); track t.id) {
           <div class="entry">
-            <a
-              class="entry__name entry__name--link"
-              [routerLink]="['/collection']"
-              [queryParams]="{ search: t.name }"
-              [title]="'View games in your collection tagged with this ' + (t.type === 'CATEGORY' ? 'category' : 'mechanic')"
-            >{{ t.name }}</a>
+            <div class="entry__name-wrap">
+              <a
+                class="entry__name entry__name--link"
+                [routerLink]="['/collection']"
+                [queryParams]="{ search: t.name }"
+                [title]="'View games in your collection tagged with this ' + (t.type === 'CATEGORY' ? 'category' : 'mechanic')"
+              >{{ t.name }}</a>
+              @if (isNewTag(t)) {
+                <span class="badge--new" title="Added since you last viewed the Dictionary">New</span>
+              }
+            </div>
             @if (editingTagId() === t.id) {
               <div class="entry__edit">
                 <textarea

@@ -7,4 +7,5 @@ export interface TagDescription {
   // and no one has written a description yet.
   description: string | null;
   source: 'AI' | 'USER' | 'PENDING';
+  createdAt: string;
 }

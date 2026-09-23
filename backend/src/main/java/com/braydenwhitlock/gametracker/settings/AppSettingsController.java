@@ -4,6 +4,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -31,5 +32,11 @@ public class AppSettingsController {
     @PatchMapping
     public AppSettings update(@RequestBody Map<String, Boolean> body) {
         return service.updateAiEnabled(body.get("aiEnabled"));
+    }
+
+    @Operation(summary = "Mark the Dictionary page as viewed just now, resetting which entries count as \"New\"")
+    @PostMapping("/dictionary-viewed")
+    public AppSettings markDictionaryViewed() {
+        return service.markDictionaryViewed();
     }
 }

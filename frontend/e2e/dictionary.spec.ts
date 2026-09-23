@@ -5,7 +5,8 @@ import {
   e2eTitle,
   waitForTagDescription,
   deleteTagDescription,
-  setAiEnabled
+  setAiEnabled,
+  TagDescriptionRow
 } from './support/api';
 
 test.describe('Dictionary page', () => {
@@ -78,13 +79,20 @@ test.describe('Dictionary page', () => {
     // without one, TagDescriptionService.ensureDescribed still creates a row (a
     // PENDING placeholder — see the "not yet described" test below), just not an
     // AI-authored one, so the skip condition checks source, not just presence.
+    //
+    // Seeding and the skip check both happen INSIDE the try — test.skip() throws to
+    // abort the test, and if that happened before the try started, the seeded game
+    // and tag row would never get cleaned up on every skipped (i.e. unconfigured) run.
     const categoryName = e2eTitle('novel category');
     const gameTitle = e2eTitle('dictionary ai tag');
-    const gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
-    let tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
-    test.skip(!tag || tag.source !== 'AI', 'No ANTHROPIC_API_KEY configured in this environment — see backend/.env.');
+    let gameId: number | undefined;
+    let tag: TagDescriptionRow | null = null;
 
     try {
+      gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
+      tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
+      test.skip(!tag || tag.source !== 'AI', 'No ANTHROPIC_API_KEY configured in this environment — see backend/.env.');
+
       await page.goto('/dictionary');
       const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: categoryName }) });
 
@@ -102,7 +110,7 @@ test.describe('Dictionary page', () => {
       await expect(page.locator('.entry__name', { hasText: categoryName })).not.toBeVisible();
       tag = null;
     } finally {
-      await deleteGame(request, gameId);
+      if (gameId) await deleteGame(request, gameId);
       if (tag) await deleteTagDescription(request, tag.id);
     }
   });
@@ -135,6 +143,35 @@ test.describe('Dictionary page', () => {
       await expect(row.locator('.entry__desc')).toContainText('A manually written description.');
     } finally {
       await setAiEnabled(request, true);
+      await deleteGame(request, gameId);
+      if (tag) await deleteTagDescription(request, tag.id);
+    }
+  });
+
+  test('marks a freshly added entry as "New" until you view the Dictionary page again', async ({ page, request }) => {
+    const categoryName = e2eTitle('new badge category');
+    const gameTitle = e2eTitle('new badge game');
+    const gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
+    const tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
+
+    try {
+      expect(tag).not.toBeNull();
+      const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: categoryName }) });
+
+      await page.goto('/dictionary');
+      await expect(row.locator('.badge--new')).toBeVisible();
+
+      // Loading the page fires a fire-and-forget "mark viewed" call — wait for it to
+      // actually land (dictionaryLastViewedAt now past this tag's createdAt) before
+      // reloading, rather than racing an arbitrary timeout against the network.
+      await expect.poll(async () => {
+        const settings = await request.get('/api/settings').then(r => r.json());
+        return settings.dictionaryLastViewedAt && new Date(settings.dictionaryLastViewedAt) > new Date(tag!.createdAt);
+      }).toBe(true);
+
+      await page.reload();
+      await expect(row.locator('.badge--new')).not.toBeVisible();
+    } finally {
       await deleteGame(request, gameId);
       if (tag) await deleteTagDescription(request, tag.id);
     }

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -50,5 +51,19 @@ class AppSettingsServiceTest {
         AppSettings updated = service.updateAiEnabled(false);
 
         assertThat(updated.isAiEnabled()).isFalse();
+    }
+
+    @Test
+    void markDictionaryViewedStampsTheCurrentTime() {
+        AppSettings settings = new AppSettings();
+        settings.setId(1L);
+        when(repository.findById(1L)).thenReturn(Optional.of(settings));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        Instant before = Instant.now();
+        AppSettings updated = service.markDictionaryViewed();
+        Instant after = Instant.now();
+
+        assertThat(updated.getDictionaryLastViewedAt()).isBetween(before, after);
     }
 }

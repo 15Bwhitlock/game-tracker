@@ -2,7 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { TagDescriptionApi } from '@shared/api';
+import { AppSettingsApi, TagDescriptionApi } from '@shared/api';
 import { GAME_CATEGORIES, GAME_MECHANICS, TagDescription } from '@shared/models';
 import { describeHttpError } from '@shared/services';
 
@@ -42,6 +42,7 @@ export interface RatingTip {
 })
 export class DictionaryPage implements OnInit {
   private readonly api = inject(TagDescriptionApi);
+  private readonly settingsApi = inject(AppSettingsApi);
 
   readonly searchTerm = signal('');
 
@@ -182,9 +183,28 @@ export class DictionaryPage implements OnInit {
   readonly editingTagValue = signal('');
   readonly savingTag = signal(false);
 
+  // The value from BEFORE this page load — used to decide which entries are "New"
+  // for this render. Null means "never viewed before," which we treat as "everything
+  // is new" (a harmless one-time badge burst, not worth guarding against).
+  readonly dictionaryLastViewedAt = signal<string | null>(null);
+
+  isNewTag(tag: TagDescription): boolean {
+    const lastViewed = this.dictionaryLastViewedAt();
+    if (!lastViewed) return true;
+    return new Date(tag.createdAt) > new Date(lastViewed);
+  }
+
   ngOnInit(): void {
     this.api.list().subscribe({
       next: tags => this.learnedTags.set(tags),
+      error: err => this.loadError.set(describeHttpError(err))
+    });
+    this.settingsApi.get().subscribe({
+      next: settings => {
+        this.dictionaryLastViewedAt.set(settings.dictionaryLastViewedAt);
+        // Reset for next time — fire-and-forget, this render already has the old value.
+        this.settingsApi.markDictionaryViewed().subscribe();
+      },
       error: err => this.loadError.set(describeHttpError(err))
     });
   }
