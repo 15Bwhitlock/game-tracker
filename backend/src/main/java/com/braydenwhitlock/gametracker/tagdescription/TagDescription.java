@@ -32,7 +32,9 @@ public class TagDescription {
     @Column(nullable = false)
     private TagType type;
 
-    @Column(columnDefinition = "TEXT", nullable = false)
+    // Null while PENDING (see TagSource) — a placeholder waiting on a manual description
+    // because AI generation was unavailable when this name was first saved.
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Enumerated(EnumType.STRING)

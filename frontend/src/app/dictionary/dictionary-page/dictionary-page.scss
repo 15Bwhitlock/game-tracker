@@ -117,6 +117,11 @@
   font-size: 0.9rem;
 }
 
+.entry__desc--pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 .alert {
   padding: 0.75rem 1rem;
   border-radius: 6px;

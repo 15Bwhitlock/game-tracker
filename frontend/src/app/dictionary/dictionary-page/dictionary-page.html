@@ -180,8 +180,17 @@
               </div>
             } @else {
               <span class="entry__desc">
-                {{ t.description }}
-                <button type="button" class="btn--icon" title="Edit description" (click)="startEditTag(t)">📝</button>
+                @if (t.source === 'PENDING') {
+                  <span class="entry__desc--pending">Not yet described — AI generation is off, add one yourself.</span>
+                } @else {
+                  {{ t.description }}
+                }
+                <button
+                  type="button"
+                  class="btn--icon"
+                  [title]="t.source === 'PENDING' ? 'Add description' : 'Edit description'"
+                  (click)="startEditTag(t)"
+                >{{ t.source === 'PENDING' ? '➕' : '📝' }}</button>
                 <button type="button" class="btn--icon btn--icon-danger" title="Remove this entry" (click)="removeTagDescription(t)">✕</button>
               </span>
             }

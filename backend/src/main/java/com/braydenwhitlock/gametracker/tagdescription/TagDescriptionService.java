@@ -1,11 +1,13 @@
 package com.braydenwhitlock.gametracker.tagdescription;
 
 import com.braydenwhitlock.gametracker.ai.AnthropicClient;
+import com.braydenwhitlock.gametracker.settings.AppSettingsService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -14,10 +16,16 @@ public class TagDescriptionService {
 
     private final TagDescriptionRepository repository;
     private final AnthropicClient anthropicClient;
+    private final AppSettingsService appSettingsService;
 
-    public TagDescriptionService(TagDescriptionRepository repository, AnthropicClient anthropicClient) {
+    public TagDescriptionService(
+            TagDescriptionRepository repository,
+            AnthropicClient anthropicClient,
+            AppSettingsService appSettingsService
+    ) {
         this.repository = repository;
         this.anthropicClient = anthropicClient;
+        this.appSettingsService = appSettingsService;
     }
 
     @Transactional(readOnly = true)
@@ -26,10 +34,19 @@ public class TagDescriptionService {
     }
 
     /**
-     * If {@code name} is already a curated preset, or already has a description saved,
-     * does nothing. Otherwise asks Claude to write one and persists it — only on a
-     * successful (non-empty) response, so a transient failure just means "try again the
-     * next time this name is saved," never a permanently blank row.
+     * If {@code name} is already a curated preset, does nothing. Otherwise:
+     * <ul>
+     *   <li>no existing row, AI available — asks Claude to write one and saves it only on
+     *       a successful (non-empty) response, so a transient failure just means "try
+     *       again the next time this name is saved," never a permanently blank row.</li>
+     *   <li>no existing row, AI unavailable (toggled off in settings, or no
+     *       {@code ANTHROPIC_API_KEY} configured) — saves a PENDING placeholder with no
+     *       description, so the name still shows up on the Dictionary page for the user
+     *       to describe manually.</li>
+     *   <li>existing PENDING row, AI now available — backfills it via Claude, same as a
+     *       new name (covers "I turned AI on after opting out for a while").</li>
+     *   <li>existing row with a description (AI- or user-written) — does nothing.</li>
+     * </ul>
      */
     public void ensureDescribed(String name, TagType type) {
         if (name == null || name.isBlank()) {
@@ -39,19 +56,48 @@ public class TagDescriptionService {
         if (presets.contains(name)) {
             return;
         }
-        if (repository.findByNameIgnoreCaseAndType(name, type).isPresent()) {
-            return;
-        }
-        anthropicClient.describeTag(name, type == TagType.CATEGORY ? "category" : "mechanic")
-                .ifPresent(description -> {
-                    TagDescription tag = new TagDescription();
-                    tag.setName(name);
-                    tag.setType(type);
+
+        Optional<TagDescription> existing = repository.findByNameIgnoreCaseAndType(name, type);
+        if (existing.isPresent()) {
+            TagDescription tag = existing.get();
+            if (isBlank(tag.getDescription()) && aiAvailable()) {
+                anthropicClient.describeTag(name, kindLabel(type)).ifPresent(description -> {
                     tag.setDescription(description);
                     tag.setSource(TagSource.AI);
-                    tag.setCreatedAt(Instant.now());
                     repository.save(tag);
                 });
+            }
+            return;
+        }
+
+        if (aiAvailable()) {
+            anthropicClient.describeTag(name, kindLabel(type))
+                    .ifPresent(description -> save(name, type, description, TagSource.AI));
+        } else {
+            save(name, type, null, TagSource.PENDING);
+        }
+    }
+
+    private boolean aiAvailable() {
+        return appSettingsService.get().isAiEnabled() && anthropicClient.isConfigured();
+    }
+
+    private void save(String name, TagType type, String description, TagSource source) {
+        TagDescription tag = new TagDescription();
+        tag.setName(name);
+        tag.setType(type);
+        tag.setDescription(description);
+        tag.setSource(source);
+        tag.setCreatedAt(Instant.now());
+        repository.save(tag);
+    }
+
+    private static boolean isBlank(String s) {
+        return s == null || s.isBlank();
+    }
+
+    private static String kindLabel(TagType type) {
+        return type == TagType.CATEGORY ? "category" : "mechanic";
     }
 
     public TagDescription updateDescription(Long id, String description) {

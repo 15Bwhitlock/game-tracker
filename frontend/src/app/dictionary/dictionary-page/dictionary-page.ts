@@ -174,7 +174,7 @@ export class DictionaryPage implements OnInit {
     const tags = this.learnedTags().filter(t => !this.presetNames.has(t.name));
     if (!term) return tags;
     return tags.filter(t =>
-      t.name.toLowerCase().includes(term) || t.description.toLowerCase().includes(term)
+      t.name.toLowerCase().includes(term) || (t.description ?? '').toLowerCase().includes(term)
     );
   });
 
@@ -191,7 +191,7 @@ export class DictionaryPage implements OnInit {
 
   startEditTag(tag: TagDescription): void {
     this.editingTagId.set(tag.id);
-    this.editingTagValue.set(tag.description);
+    this.editingTagValue.set(tag.description ?? '');
   }
 
   cancelEditTag(): void {

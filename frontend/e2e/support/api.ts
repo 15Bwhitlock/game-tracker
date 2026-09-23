@@ -200,3 +200,17 @@ export async function deleteTagDescription(request: APIRequestContext, id: numbe
     throw new Error(`deleteTagDescription(${id}) failed: ${response.status()} ${await response.text()}`);
   }
 }
+
+/** Reads the current value of the app-wide "AI enabled" setting. */
+export async function getAiEnabled(request: APIRequestContext): Promise<boolean> {
+  const response = await request.get('/api/settings');
+  expect(response.ok()).toBeTruthy();
+  const body = await response.json();
+  return body.aiEnabled as boolean;
+}
+
+/** Flips the app-wide "AI enabled" setting and returns the new value. */
+export async function setAiEnabled(request: APIRequestContext, aiEnabled: boolean): Promise<void> {
+  const response = await request.patch('/api/settings', { data: { aiEnabled } });
+  expect(response.ok(), `setAiEnabled failed: ${response.status()} ${await response.text()}`).toBeTruthy();
+}

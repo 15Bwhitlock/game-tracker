@@ -54,6 +54,11 @@ public class AnthropicClient {
         }
     }
 
+    /** True if an {@code ANTHROPIC_API_KEY} was configured at startup. */
+    public boolean isConfigured() {
+        return configured;
+    }
+
     /**
      * Asks Claude for a one-sentence description of {@code name} (a category or mechanic,
      * per {@code kind}, e.g. "category"/"mechanic"). Empty on any failure — no key, network

@@ -1,0 +1,31 @@
+<section class="page">
+  <header class="page__header">
+    <h1>Settings</h1>
+  </header>
+
+  @if (error()) {
+    <div class="alert alert--error" role="alert">{{ error() }}</div>
+  }
+
+  @if (!loading()) {
+    <div class="card">
+      <h2 class="section-title">AI Features</h2>
+      <p class="section-subtitle">
+        When you save a category or mechanic that isn't in the curated Dictionary list,
+        Claude writes a one-sentence description for it automatically. Turn this off to
+        write those descriptions yourself instead — new entries still show up on the
+        Dictionary page's "From Your Collection" section, just waiting for you to fill
+        them in.
+      </p>
+      <label class="toggle-row">
+        <input
+          type="checkbox"
+          [checked]="aiEnabled()"
+          [disabled]="saving()"
+          (change)="toggleAi()"
+        />
+        <span>Auto-write category/mechanic descriptions with AI</span>
+      </label>
+    </div>
+  }
+</section>

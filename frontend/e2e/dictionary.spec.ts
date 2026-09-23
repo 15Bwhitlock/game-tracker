@@ -1,5 +1,12 @@
 import { test, expect } from '@playwright/test';
-import { seedGame, deleteGame, e2eTitle, waitForTagDescription, deleteTagDescription } from './support/api';
+import {
+  seedGame,
+  deleteGame,
+  e2eTitle,
+  waitForTagDescription,
+  deleteTagDescription,
+  setAiEnabled
+} from './support/api';
 
 test.describe('Dictionary page', () => {
   test('lists reference sections by default', async ({ page }) => {
@@ -68,20 +75,21 @@ test.describe('Dictionary page', () => {
 
   test('shows an AI-written description for a genuinely new category, and lets you edit or delete it', async ({ page, request }) => {
     // Only meaningful with a real ANTHROPIC_API_KEY configured (see backend/.env) —
-    // without one, TagDescriptionService.ensureDescribed silently no-ops and no
-    // row ever appears for this brand-new category name.
+    // without one, TagDescriptionService.ensureDescribed still creates a row (a
+    // PENDING placeholder — see the "not yet described" test below), just not an
+    // AI-authored one, so the skip condition checks source, not just presence.
     const categoryName = e2eTitle('novel category');
     const gameTitle = e2eTitle('dictionary ai tag');
     const gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
     let tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
-    test.skip(!tag, 'No ANTHROPIC_API_KEY configured in this environment — see backend/.env.');
+    test.skip(!tag || tag.source !== 'AI', 'No ANTHROPIC_API_KEY configured in this environment — see backend/.env.');
 
     try {
       await page.goto('/dictionary');
       const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: categoryName }) });
 
       await expect(page.getByRole('heading', { name: 'From Your Collection' })).toBeVisible();
-      await expect(row.locator('.entry__desc')).toContainText(tag!.description);
+      await expect(row.locator('.entry__desc')).toContainText(tag!.description ?? '');
 
       // Edit — the user correcting a bad or imprecise AI guess.
       await row.getByTitle('Edit description').click();
@@ -94,6 +102,39 @@ test.describe('Dictionary page', () => {
       await expect(page.locator('.entry__name', { hasText: categoryName })).not.toBeVisible();
       tag = null;
     } finally {
+      await deleteGame(request, gameId);
+      if (tag) await deleteTagDescription(request, tag.id);
+    }
+  });
+
+  test('shows a "not yet described" placeholder for a new category when AI is turned off, and lets you fill it in', async ({ page, request }) => {
+    // Deterministic regardless of whether ANTHROPIC_API_KEY is configured — this
+    // is exactly the manual-fallback path TagDescriptionService.ensureDescribed
+    // takes when AI generation isn't available (see AppSettingsService).
+    await setAiEnabled(request, false);
+
+    const categoryName = e2eTitle('pending category');
+    const gameTitle = e2eTitle('dictionary pending tag');
+    const gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
+    const tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
+
+    try {
+      expect(tag, 'expected a PENDING placeholder row to be created even with AI off').not.toBeNull();
+      expect(tag!.source).toBe('PENDING');
+      expect(tag!.description).toBeNull();
+
+      await page.goto('/dictionary');
+      const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: categoryName }) });
+      await expect(row.locator('.entry__desc--pending')).toBeVisible();
+
+      await row.getByTitle('Add description').click();
+      await row.locator('textarea').fill('A manually written description.');
+      await row.getByRole('button', { name: 'Save' }).click();
+
+      await expect(row.locator('.entry__desc--pending')).not.toBeVisible();
+      await expect(row.locator('.entry__desc')).toContainText('A manually written description.');
+    } finally {
+      await setAiEnabled(request, true);
       await deleteGame(request, gameId);
       if (tag) await deleteTagDescription(request, tag.id);
     }

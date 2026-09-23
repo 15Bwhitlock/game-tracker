@@ -1,6 +1,8 @@
 package com.braydenwhitlock.gametracker.tagdescription;
 
 import com.braydenwhitlock.gametracker.ai.AnthropicClient;
+import com.braydenwhitlock.gametracker.settings.AppSettings;
+import com.braydenwhitlock.gametracker.settings.AppSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -18,13 +20,22 @@ class TagDescriptionServiceTest {
 
     private TagDescriptionRepository repository;
     private AnthropicClient anthropicClient;
+    private AppSettingsService appSettingsService;
     private TagDescriptionService service;
 
     @BeforeEach
     void setUp() {
         repository = Mockito.mock(TagDescriptionRepository.class);
         anthropicClient = Mockito.mock(AnthropicClient.class);
-        service = new TagDescriptionService(repository, anthropicClient);
+        appSettingsService = Mockito.mock(AppSettingsService.class);
+        service = new TagDescriptionService(repository, anthropicClient, appSettingsService);
+
+        // Default: AI on and configured — most tests care about the preset/existing-row
+        // logic, not the toggle itself. Tests that care override this explicitly.
+        AppSettings settings = new AppSettings();
+        settings.setAiEnabled(true);
+        when(appSettingsService.get()).thenReturn(settings);
+        when(anthropicClient.isConfigured()).thenReturn(true);
     }
 
     @Test
@@ -37,12 +48,15 @@ class TagDescriptionServiceTest {
 
     @Test
     void skipsANameThatAlreadyHasADescription() {
+        TagDescription existing = new TagDescription();
+        existing.setDescription("Already written.");
         when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.of(new TagDescription()));
+                .thenReturn(Optional.of(existing));
 
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
         verify(anthropicClient, never()).describeTag(any(), any());
+        verify(repository, never()).save(any());
     }
 
     @Test
@@ -69,6 +83,74 @@ class TagDescriptionServiceTest {
 
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void savesAPendingPlaceholderWhenAiIsToggledOffInsteadOfCallingTheAi() {
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
+                .thenReturn(Optional.empty());
+        AppSettings disabled = new AppSettings();
+        disabled.setAiEnabled(false);
+        when(appSettingsService.get()).thenReturn(disabled);
+
+        service.ensureDescribed("Take That", TagType.MECHANIC);
+
+        verify(anthropicClient, never()).describeTag(any(), any());
+        verify(repository).save(org.mockito.ArgumentMatchers.argThat(tag ->
+                tag.getName().equals("Take That")
+                        && tag.getDescription() == null
+                        && tag.getSource() == TagSource.PENDING));
+    }
+
+    @Test
+    void savesAPendingPlaceholderWhenNoApiKeyIsConfiguredEvenIfTheToggleIsOn() {
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
+                .thenReturn(Optional.empty());
+        when(anthropicClient.isConfigured()).thenReturn(false);
+
+        service.ensureDescribed("Take That", TagType.MECHANIC);
+
+        verify(anthropicClient, never()).describeTag(any(), any());
+        verify(repository).save(org.mockito.ArgumentMatchers.argThat(tag ->
+                tag.getSource() == TagSource.PENDING));
+    }
+
+    @Test
+    void backfillsAPendingRowViaAiOnceAiBecomesAvailableAgain() {
+        TagDescription pending = new TagDescription();
+        pending.setName("Take That");
+        pending.setType(TagType.MECHANIC);
+        pending.setDescription(null);
+        pending.setSource(TagSource.PENDING);
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
+                .thenReturn(Optional.of(pending));
+        when(anthropicClient.describeTag("Take That", "mechanic"))
+                .thenReturn(Optional.of("Players can directly hinder or damage each other."));
+
+        service.ensureDescribed("Take That", TagType.MECHANIC);
+
+        assertThat(pending.getDescription()).isEqualTo("Players can directly hinder or damage each other.");
+        assertThat(pending.getSource()).isEqualTo(TagSource.AI);
+        verify(repository).save(pending);
+    }
+
+    @Test
+    void leavesAPendingRowAloneWhenAiIsStillUnavailable() {
+        TagDescription pending = new TagDescription();
+        pending.setName("Take That");
+        pending.setType(TagType.MECHANIC);
+        pending.setDescription(null);
+        pending.setSource(TagSource.PENDING);
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
+                .thenReturn(Optional.of(pending));
+        AppSettings disabled = new AppSettings();
+        disabled.setAiEnabled(false);
+        when(appSettingsService.get()).thenReturn(disabled);
+
+        service.ensureDescribed("Take That", TagType.MECHANIC);
+
+        verify(anthropicClient, never()).describeTag(any(), any());
         verify(repository, never()).save(any());
     }
 
