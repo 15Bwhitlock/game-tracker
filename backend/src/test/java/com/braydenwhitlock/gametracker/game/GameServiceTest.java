@@ -1,5 +1,6 @@
 package com.braydenwhitlock.gametracker.game;
 
+import com.braydenwhitlock.gametracker.tagdescription.TagDescriptionService;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,7 @@ class GameServiceTest {
         gameRepo = Mockito.mock(GameRepository.class);
         playRepo = Mockito.mock(GamePlayRepository.class);
         em = Mockito.mock(EntityManager.class);
-        service = new GameService(gameRepo, playRepo, em);
+        service = new GameService(gameRepo, playRepo, em, Mockito.mock(TagDescriptionService.class));
     }
 
     // --- findById ---

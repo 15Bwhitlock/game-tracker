@@ -160,3 +160,43 @@ export async function deleteAllE2eWishlistItems(request: APIRequestContext): Pro
   const stray = items.filter((i) => i.title.startsWith(E2E_TITLE_PREFIX));
   await Promise.all(stray.map((i) => deleteWishlistItem(request, i.id)));
 }
+
+export interface TagDescriptionRow {
+  id: number;
+  name: string;
+  type: 'CATEGORY' | 'MECHANIC';
+  description: string;
+  source: 'AI' | 'USER';
+}
+
+/**
+ * Polls GET /api/tag-descriptions for a row matching (name, type), written
+ * asynchronously by TagDescriptionService after a game/wishlist save. Only ever
+ * appears when a real ANTHROPIC_API_KEY is configured (see backend/.env) — returns
+ * null on timeout so callers can test.skip rather than fail in an unconfigured env.
+ */
+export async function waitForTagDescription(
+  request: APIRequestContext,
+  name: string,
+  type: 'CATEGORY' | 'MECHANIC',
+  timeoutMs = 20000
+): Promise<TagDescriptionRow | null> {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    const response = await request.get('/api/tag-descriptions');
+    expect(response.ok()).toBeTruthy();
+    const rows = (await response.json()) as TagDescriptionRow[];
+    const match = rows.find((r) => r.type === type && r.name.toLowerCase() === name.toLowerCase());
+    if (match) return match;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+  return null;
+}
+
+/** Deletes a tag description by id; tolerates it already being gone. */
+export async function deleteTagDescription(request: APIRequestContext, id: number): Promise<void> {
+  const response = await request.delete(`/api/tag-descriptions/${id}`);
+  if (!response.ok() && response.status() !== 404) {
+    throw new Error(`deleteTagDescription(${id}) failed: ${response.status()} ${await response.text()}`);
+  }
+}

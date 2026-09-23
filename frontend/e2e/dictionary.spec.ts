@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { seedGame, deleteGame, e2eTitle } from './support/api';
+import { seedGame, deleteGame, e2eTitle, waitForTagDescription, deleteTagDescription } from './support/api';
 
 test.describe('Dictionary page', () => {
   test('lists reference sections by default', async ({ page }) => {
@@ -63,6 +63,39 @@ test.describe('Dictionary page', () => {
       await expect(page.getByRole('button', { name: title })).toBeVisible();
     } finally {
       await deleteGame(request, id);
+    }
+  });
+
+  test('shows an AI-written description for a genuinely new category, and lets you edit or delete it', async ({ page, request }) => {
+    // Only meaningful with a real ANTHROPIC_API_KEY configured (see backend/.env) —
+    // without one, TagDescriptionService.ensureDescribed silently no-ops and no
+    // row ever appears for this brand-new category name.
+    const categoryName = e2eTitle('novel category');
+    const gameTitle = e2eTitle('dictionary ai tag');
+    const gameId = await seedGame(request, { title: gameTitle, categories: [categoryName] });
+    let tag = await waitForTagDescription(request, categoryName, 'CATEGORY');
+    test.skip(!tag, 'No ANTHROPIC_API_KEY configured in this environment — see backend/.env.');
+
+    try {
+      await page.goto('/dictionary');
+      const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: categoryName }) });
+
+      await expect(page.getByRole('heading', { name: 'From Your Collection' })).toBeVisible();
+      await expect(row.locator('.entry__desc')).toContainText(tag!.description);
+
+      // Edit — the user correcting a bad or imprecise AI guess.
+      await row.getByTitle('Edit description').click();
+      await row.locator('textarea').fill('A corrected, user-written description.');
+      await row.getByRole('button', { name: 'Save' }).click();
+      await expect(row.locator('.entry__desc')).toContainText('A corrected, user-written description.');
+
+      // Delete — removing the entry entirely.
+      await row.getByTitle('Remove this entry').click();
+      await expect(page.locator('.entry__name', { hasText: categoryName })).not.toBeVisible();
+      tag = null;
+    } finally {
+      await deleteGame(request, gameId);
+      if (tag) await deleteTagDescription(request, tag.id);
     }
   });
 });

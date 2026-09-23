@@ -7,3 +7,4 @@ export { GAME_CATEGORIES } from './game-categories';
 export { GAME_MECHANICS } from './game-mechanics';
 export type { BggSearchHit, BggGameDetails } from './bgg';
 export { PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from './game-constants';
+export type { TagDescription } from './tag-description';

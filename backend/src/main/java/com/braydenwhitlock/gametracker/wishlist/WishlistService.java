@@ -2,6 +2,8 @@ package com.braydenwhitlock.gametracker.wishlist;
 
 import com.braydenwhitlock.gametracker.game.Game;
 import com.braydenwhitlock.gametracker.game.GameRepository;
+import com.braydenwhitlock.gametracker.tagdescription.TagDescriptionService;
+import com.braydenwhitlock.gametracker.tagdescription.TagType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,10 +20,13 @@ public class WishlistService {
 
     private final WishlistRepository wishlistRepository;
     private final GameRepository gameRepository;
+    private final TagDescriptionService tagDescriptionService;
 
-    public WishlistService(WishlistRepository wishlistRepository, GameRepository gameRepository) {
+    public WishlistService(WishlistRepository wishlistRepository, GameRepository gameRepository,
+                            TagDescriptionService tagDescriptionService) {
         this.wishlistRepository = wishlistRepository;
         this.gameRepository = gameRepository;
+        this.tagDescriptionService = tagDescriptionService;
     }
 
     @Transactional(readOnly = true)
@@ -39,7 +44,16 @@ public class WishlistService {
         if (item.getAddedAt() == null) {
             item.setAddedAt(LocalDate.now());
         }
-        return wishlistRepository.save(item);
+        Wishlist saved = wishlistRepository.save(item);
+        // See GameService.describeNewTags — same reasoning, no update path to wire here
+        // since a wishlist item's categories/mechanics are only ever set at creation.
+        for (String category : saved.getCategories()) {
+            tagDescriptionService.ensureDescribed(category, TagType.CATEGORY);
+        }
+        for (String mechanic : saved.getMechanics()) {
+            tagDescriptionService.ensureDescribed(mechanic, TagType.MECHANIC);
+        }
+        return saved;
     }
 
     public Wishlist updateNotes(Long id, String notes) {
