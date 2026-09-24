@@ -24,12 +24,6 @@ public class AppSettingsService {
                 .orElseThrow(() -> new IllegalStateException("app_settings row is missing"));
     }
 
-    public AppSettings updateAiEnabled(boolean aiEnabled) {
-        AppSettings settings = get();
-        settings.setAiEnabled(aiEnabled);
-        return repository.save(settings);
-    }
-
     /**
      * Stamps "now" as the Dictionary page's last-viewed time. Call this once per
      * page load, after reading the previous value to decide which entries are

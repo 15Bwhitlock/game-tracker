@@ -1,8 +1,5 @@
 package com.braydenwhitlock.gametracker.tagdescription;
 
-import com.braydenwhitlock.gametracker.ai.AnthropicClient;
-import com.braydenwhitlock.gametracker.settings.AppSettings;
-import com.braydenwhitlock.gametracker.settings.AppSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -10,12 +7,14 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -23,167 +22,78 @@ import static org.mockito.Mockito.when;
 class TagDescriptionServiceTest {
 
     private TagDescriptionRepository repository;
-    private AnthropicClient anthropicClient;
-    private AppSettingsService appSettingsService;
     private TagDescriptionService service;
 
     @BeforeEach
     void setUp() {
         repository = Mockito.mock(TagDescriptionRepository.class);
-        anthropicClient = Mockito.mock(AnthropicClient.class);
-        appSettingsService = Mockito.mock(AppSettingsService.class);
         PlatformTransactionManager transactionManager = Mockito.mock(PlatformTransactionManager.class);
         when(transactionManager.getTransaction(any())).thenReturn(Mockito.mock(TransactionStatus.class));
-        service = new TagDescriptionService(repository, anthropicClient, appSettingsService, transactionManager);
+        service = new TagDescriptionService(repository, transactionManager);
+    }
 
-        // Default: AI on and configured — most tests care about the preset/existing-row
-        // logic, not the toggle itself. Tests that care override this explicitly.
-        AppSettings settings = new AppSettings();
-        settings.setAiEnabled(true);
-        when(appSettingsService.get()).thenReturn(settings);
-        when(anthropicClient.isConfigured()).thenReturn(true);
+    private static TagDescription row(Long id, String name, TagType type, TagSource source) {
+        TagDescription t = new TagDescription();
+        t.setId(id);
+        t.setName(name);
+        t.setType(type);
+        t.setSource(source);
+        return t;
     }
 
     @Test
-    void skipsAPresetNameWithoutCallingTheAiOrTouchingTheRepository() {
+    void skipsAPresetNameWithoutTouchingTheRepository() {
         service.ensureDescribed("Strategy", TagType.CATEGORY);
 
-        verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository, never()).save(any());
+        verify(repository, never()).findByNameIgnoreCaseAndType(any(), any());
         verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
-    void skipsANameThatAlreadyHasADescription() {
-        TagDescription existing = new TagDescription();
-        existing.setDescription("Already written.");
+    void skipsANameThatAlreadyHasARow() {
         when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.of(existing));
+                .thenReturn(Optional.of(new TagDescription()));
 
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
-        verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
-    void generatesAndSavesADescriptionForAGenuinelyNewName() {
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.empty());
-        when(anthropicClient.describeTag("Take That", "mechanic"))
-                .thenReturn(Optional.of("Players can directly hinder or damage each other."));
+    void savesAPendingPlaceholderForAGenuinelyNewName() {
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC)).thenReturn(Optional.empty());
 
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
-        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
+        verify(repository).saveAndFlush(argThat(tag ->
                 tag.getName().equals("Take That")
                         && tag.getType() == TagType.MECHANIC
-                        && tag.getSource() == TagSource.AI
-                        && tag.getDescription().equals("Players can directly hinder or damage each other.")));
-    }
-
-    @Test
-    void doesNotSaveAnythingWhenTheAiCallFails() {
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.empty());
-        when(anthropicClient.describeTag("Take That", "mechanic")).thenReturn(Optional.empty());
-
-        service.ensureDescribed("Take That", TagType.MECHANIC);
-
-        verify(repository, never()).save(any());
-        verify(repository, never()).saveAndFlush(any());
-    }
-
-    @Test
-    void savesAPendingPlaceholderWhenAiIsToggledOffInsteadOfCallingTheAi() {
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.empty());
-        AppSettings disabled = new AppSettings();
-        disabled.setAiEnabled(false);
-        when(appSettingsService.get()).thenReturn(disabled);
-
-        service.ensureDescribed("Take That", TagType.MECHANIC);
-
-        verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
-                tag.getName().equals("Take That")
                         && tag.getDescription() == null
                         && tag.getSource() == TagSource.PENDING));
     }
 
     @Test
-    void savesAPendingPlaceholderWhenNoApiKeyIsConfiguredEvenIfTheToggleIsOn() {
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.empty());
-        when(anthropicClient.isConfigured()).thenReturn(false);
+    void ignoresBlankNames() {
+        service.ensureDescribed("  ", TagType.CATEGORY);
+        service.ensureDescribed(null, TagType.CATEGORY);
 
-        service.ensureDescribed("Take That", TagType.MECHANIC);
-
-        verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
-                tag.getSource() == TagSource.PENDING));
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
     void swallowsAUniqueConstraintViolationWhenTwoRequestsRaceToDescribeTheSameNewName() {
-        // Simulates the real bug this guards against: the Collection page's bulk-tag
-        // action can save several games with the same brand-new category concurrently.
-        // Both requests see "no existing row" and try to insert; the unique index on
-        // (lower(name), type) rejects the loser. That must never fail the caller's real
-        // work (e.g. GameService.update saving the game itself).
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.empty());
-        when(anthropicClient.describeTag("Take That", "mechanic"))
-                .thenReturn(Optional.of("Players can directly hinder or damage each other."));
+        // The Collection page's bulk-tag action saves several games with the same new
+        // category concurrently; the unique index rejects the loser. That must never
+        // fail the caller's real work (e.g. GameService.update saving the game itself).
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC)).thenReturn(Optional.empty());
         when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
 
         assertThatCode(() -> service.ensureDescribed("Take That", TagType.MECHANIC)).doesNotThrowAnyException();
     }
 
     @Test
-    void backfillsAPendingRowViaAiOnceAiBecomesAvailableAgain() {
-        TagDescription pending = new TagDescription();
-        pending.setName("Take That");
-        pending.setType(TagType.MECHANIC);
-        pending.setDescription(null);
-        pending.setSource(TagSource.PENDING);
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.of(pending));
-        when(anthropicClient.describeTag("Take That", "mechanic"))
-                .thenReturn(Optional.of("Players can directly hinder or damage each other."));
-
-        service.ensureDescribed("Take That", TagType.MECHANIC);
-
-        assertThat(pending.getDescription()).isEqualTo("Players can directly hinder or damage each other.");
-        assertThat(pending.getSource()).isEqualTo(TagSource.AI);
-        verify(repository).save(pending);
-    }
-
-    @Test
-    void leavesAPendingRowAloneWhenAiIsStillUnavailable() {
-        TagDescription pending = new TagDescription();
-        pending.setName("Take That");
-        pending.setType(TagType.MECHANIC);
-        pending.setDescription(null);
-        pending.setSource(TagSource.PENDING);
-        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
-                .thenReturn(Optional.of(pending));
-        AppSettings disabled = new AppSettings();
-        disabled.setAiEnabled(false);
-        when(appSettingsService.get()).thenReturn(disabled);
-
-        service.ensureDescribed("Take That", TagType.MECHANIC);
-
-        verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository, never()).save(any());
-    }
-
-    @Test
     void updateDescriptionMarksTheRowUserEdited() {
-        TagDescription tag = new TagDescription();
-        tag.setId(1L);
-        tag.setDescription("AI-written text");
-        tag.setSource(TagSource.AI);
+        TagDescription tag = row(1L, "X", TagType.CATEGORY, TagSource.PENDING);
         when(repository.findById(1L)).thenReturn(Optional.of(tag));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -216,10 +126,8 @@ class TagDescriptionServiceTest {
 
     @Test
     void upsertOverrideUpdatesTheExistingRowInPlace() {
-        TagDescription existing = new TagDescription();
-        existing.setId(5L);
+        TagDescription existing = row(5L, "Strategy", TagType.CATEGORY, TagSource.USER);
         existing.setDescription("old");
-        existing.setSource(TagSource.USER);
         when(repository.findByNameIgnoreCaseAndType("Strategy", TagType.CATEGORY)).thenReturn(Optional.of(existing));
         when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -230,12 +138,35 @@ class TagDescriptionServiceTest {
     }
 
     @Test
+    void deletePendingRemovesOnlyPlaceholders() {
+        TagDescription pending = row(1L, "Zzz", TagType.CATEGORY, TagSource.PENDING);
+        TagDescription written = row(2L, "Yyy", TagType.CATEGORY, TagSource.USER);
+        when(repository.findAll()).thenReturn(List.of(pending, written));
+
+        assertThat(service.deletePending()).isEqualTo(1);
+
+        verify(repository).deleteAll(List.of(pending));
+    }
+
+    @Test
+    void deleteOverridesRemovesPresetAndGlossaryEditsButKeepsLearnedTags() {
+        TagDescription presetEdit = row(1L, "strategy", TagType.CATEGORY, TagSource.USER);
+        TagDescription glossaryEdit = row(2L, "Filler", TagType.GLOSSARY, TagSource.USER);
+        TagDescription learned = row(3L, "Zzz Custom", TagType.CATEGORY, TagSource.USER);
+        when(repository.findAll()).thenReturn(List.of(presetEdit, glossaryEdit, learned));
+
+        assertThat(service.deleteOverrides()).isEqualTo(2);
+
+        verify(repository).deleteAll(List.of(presetEdit, glossaryEdit));
+    }
+
+    @Test
     void deleteRemovesAnExistingRow() {
         when(repository.existsById(1L)).thenReturn(true);
 
         service.delete(1L);
 
-        org.mockito.Mockito.verify(repository).deleteById(1L);
+        verify(repository).deleteById(1L);
     }
 
     @Test

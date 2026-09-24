@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 
 import { AppSettingsApi, TagDescriptionApi } from '@shared/api';
 import { GAME_CATEGORIES, GAME_MECHANICS, TagDescription } from '@shared/models';
-import { describeHttpError } from '@shared/services';
+import { PreferencesService, describeHttpError } from '@shared/services';
 
 export interface ComplexityLevel {
   value: number;
@@ -44,6 +44,7 @@ export interface RatingTip {
 export class DictionaryPage implements OnInit {
   private readonly api = inject(TagDescriptionApi);
   private readonly settingsApi = inject(AppSettingsApi);
+  private readonly preferences = inject(PreferencesService);
 
   readonly searchTerm = signal('');
 
@@ -167,9 +168,9 @@ export class DictionaryPage implements OnInit {
   });
 
   // Categories/mechanics saved on a game or wishlist item that aren't in the curated
-  // preset lists above get an AI-written description the first time they're saved (see
-  // TagDescriptionService) — shown here, editable, kept separate from the curated lists
-  // since a preset description was hand-written and reviewed, this wasn't.
+  // preset lists above get a "Not yet described" row the first time they're saved (see
+  // TagDescriptionService) — shown here for the user to describe, kept separate from the
+  // curated lists, whose descriptions ship with the app.
   private readonly presetNames = new Set([...GAME_CATEGORIES, ...GAME_MECHANICS].map(t => t.name));
   readonly learnedTags = signal<TagDescription[]>([]);
   readonly loadError = signal<string | null>(null);
@@ -251,6 +252,7 @@ export class DictionaryPage implements OnInit {
   readonly dictionaryLastViewedAt = signal<string | null>(null);
 
   isNewTag(tag: TagDescription): boolean {
+    if (!this.preferences.prefs().showNewBadges) return false;
     const lastViewed = this.dictionaryLastViewedAt();
     if (!lastViewed) return true;
     return new Date(tag.createdAt) > new Date(lastViewed);

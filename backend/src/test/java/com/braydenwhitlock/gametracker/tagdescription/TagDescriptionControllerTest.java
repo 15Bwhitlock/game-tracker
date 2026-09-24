@@ -34,7 +34,7 @@ class TagDescriptionControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].name").value("Take That"))
                 .andExpect(jsonPath("$[0].type").value("MECHANIC"))
-                .andExpect(jsonPath("$[0].source").value("AI"));
+                .andExpect(jsonPath("$[0].source").value("USER"));
     }
 
     @Test
@@ -92,6 +92,19 @@ class TagDescriptionControllerTest {
     }
 
     @Test
+    void bulkDeletesReportHowManyRowsWereRemoved() throws Exception {
+        when(service.deletePending()).thenReturn(3);
+        when(service.deleteOverrides()).thenReturn(2);
+
+        mvc.perform(delete("/api/tag-descriptions/pending"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(3));
+        mvc.perform(delete("/api/tag-descriptions/overrides"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.deleted").value(2));
+    }
+
+    @Test
     void deleteReturns204() throws Exception {
         doNothing().when(service).delete(1L);
 
@@ -114,7 +127,7 @@ class TagDescriptionControllerTest {
         tag.setName("Take That");
         tag.setType(TagType.MECHANIC);
         tag.setDescription("Players can directly hinder or damage each other.");
-        tag.setSource(TagSource.AI);
+        tag.setSource(TagSource.USER);
         tag.setCreatedAt(Instant.now());
         return tag;
     }

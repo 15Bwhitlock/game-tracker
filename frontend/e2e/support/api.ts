@@ -166,14 +166,12 @@ export interface TagDescriptionRow {
   name: string;
   type: 'CATEGORY' | 'MECHANIC' | 'GLOSSARY';
   description: string;
-  source: 'AI' | 'USER';
+  source: 'USER' | 'PENDING';
 }
 
 /**
- * Polls GET /api/tag-descriptions for a row matching (name, type), written
- * asynchronously by TagDescriptionService after a game/wishlist save. Only ever
- * appears when a real ANTHROPIC_API_KEY is configured (see backend/.env) — returns
- * null on timeout so callers can test.skip rather than fail in an unconfigured env.
+ * Polls GET /api/tag-descriptions for a row matching (name, type), written by
+ * TagDescriptionService after a game/wishlist save; null on timeout.
  */
 export async function waitForTagDescription(
   request: APIRequestContext,
@@ -199,20 +197,6 @@ export async function deleteTagDescription(request: APIRequestContext, id: numbe
   if (!response.ok() && response.status() !== 404) {
     throw new Error(`deleteTagDescription(${id}) failed: ${response.status()} ${await response.text()}`);
   }
-}
-
-/** Reads the current value of the app-wide "AI enabled" setting. */
-export async function getAiEnabled(request: APIRequestContext): Promise<boolean> {
-  const response = await request.get('/api/settings');
-  expect(response.ok()).toBeTruthy();
-  const body = await response.json();
-  return body.aiEnabled as boolean;
-}
-
-/** Flips the app-wide "AI enabled" setting and returns the new value. */
-export async function setAiEnabled(request: APIRequestContext, aiEnabled: boolean): Promise<void> {
-  const response = await request.patch('/api/settings', { data: { aiEnabled } });
-  expect(response.ok(), `setAiEnabled failed: ${response.status()} ${await response.text()}`).toBeTruthy();
 }
 
 /** Removes any override row for a curated entry (by name+type); safety net for override tests. */

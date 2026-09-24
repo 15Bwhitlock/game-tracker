@@ -7,7 +7,7 @@ import { switchMap, tap } from 'rxjs/operators';
 
 import { BggApi, GameApi, GamePlay } from '@shared/api';
 import { BggGameDetails, BggSearchHit, Game, emptyGame, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
-import { describeHttpError, formatTime, formatDate, decodeBggDescription } from '@shared/services';
+import { describeHttpError, formatTime, formatDate, mergeBggDetails } from '@shared/services';
 
 interface TagSuggestion {
   name: string;
@@ -42,28 +42,6 @@ function titlesSimilar(a: string, b: string): boolean {
     normalize(s).split(/\s+/).filter(w => w.length >= 4 && !SERIES_STOPWORDS.has(w));
   const aWords = new Set(words(a));
   return words(b).some(w => aWords.has(w));
-}
-
-// BGG's player/time/complexity fields are free-form numbers; ours are limited to the
-// discrete button-group options (see game-constants.ts). Snap an imported value onto
-// the nearest one so the form's buttons actually light up instead of silently holding
-// an unrepresentable value.
-function snapPlayerCount(n: number | null): number | null {
-  if (n == null) return null;
-  if (n > 10) return PLAYERS_UNLIMITED;
-  return Math.max(1, Math.round(n));
-}
-
-function snapPlayTime(n: number | null): number | null {
-  if (n == null) return null;
-  if (n > 240) return TIME_UNLIMITED;
-  const buckets = TIME_OPTIONS.filter(t => t !== TIME_UNLIMITED);
-  return buckets.reduce((closest, t) => (Math.abs(t - n) < Math.abs(closest - n) ? t : closest), buckets[0]);
-}
-
-function snapComplexity(n: number | null): number | null {
-  if (n == null) return null;
-  return Math.min(5, Math.max(1, Math.round(n)));
 }
 
 @Component({
@@ -416,25 +394,7 @@ export class GameForm implements OnInit {
   // looked-up game's description, even over text you typed yourself).
   private applyBggDetails(details: BggGameDetails): void {
     this.preImportSnapshot = this.draft();
-    this.draft.update(d => ({
-      ...d,
-      bggId: details.bggId,
-      title: details.title || d.title,
-      minPlayers: snapPlayerCount(details.minPlayers) ?? d.minPlayers,
-      maxPlayers: snapPlayerCount(details.maxPlayers) ?? d.maxPlayers,
-      minPlayTimeMinutes: snapPlayTime(details.minPlayTimeMinutes) ?? d.minPlayTimeMinutes,
-      maxPlayTimeMinutes: snapPlayTime(details.maxPlayTimeMinutes) ?? d.maxPlayTimeMinutes,
-      complexityWeight: snapComplexity(details.complexityWeight) ?? d.complexityWeight,
-      categories: details.categories.length > 0 ? details.categories : d.categories,
-      mechanics: details.mechanics.length > 0 ? details.mechanics : d.mechanics,
-      thumbnailUrl: details.thumbnailUrl ?? d.thumbnailUrl,
-      imageUrl: details.imageUrl ?? d.imageUrl,
-      yearPublished: details.yearPublished ?? d.yearPublished,
-      bestPlayerCounts: details.bestPlayerCounts.length > 0 ? details.bestPlayerCounts : d.bestPlayerCounts,
-      notes: details.description ? decodeBggDescription(details.description) : d.notes,
-      basedOnBggId: details.basedOnBggId ?? d.basedOnBggId,
-      basedOnGameName: details.basedOnGameName ?? d.basedOnGameName,
-    }));
+    this.draft.update(d => mergeBggDetails(d, details));
     this.bggImportedHit.set({ bggId: details.bggId, name: details.title, yearPublished: details.yearPublished });
     this.bggMissingPersonalFields.set(this.computeMissingPersonalFields());
   }
