@@ -8,7 +8,7 @@ A personal web app to catalog board games and recommend what to play with friend
 
 - **Backend** — Java 25, Spring Boot 3.5, Maven, PostgreSQL 15, Flyway
 - **Frontend** — Angular 21 (standalone components, signals)
-- **Integrations** — BoardGameGeek XML API2 (Caffeine-cached, 24h TTL)
+- **Integrations** — BoardGameGeek XML API2 (Caffeine-cached, 24h TTL; needs a `BGG_API_TOKEN`)
 
 ## Architecture
 
@@ -24,6 +24,7 @@ A personal web app to catalog board games and recommend what to play with friend
 - Maven 3.9+
 - Node 20.19+ (Angular CLI is pulled via `npx`, no global install needed)
 - Docker (for Postgres via `docker-compose`)
+- **A BoardGameGeek API token** — free, but required for anything that talks to BGG (game search/import, Refresh from BGG, the Wishlist's trending list). BGG has required a registered app's token since Oct 2025. See [Run the backend](#2-run-the-backend) for how to get and set it. Without one the app still runs; those features just return nothing.
 
 ## Getting started
 
@@ -75,7 +76,7 @@ App is served at `http://localhost:4200`. `/api/*` requests are proxied to the b
 - **Export** — an "Export" button on the Collection page downloads the collection (independent of any active search/filter) as a timestamped JSON file.
 - **Settings** (`/settings`) — everything that isn't a per-game task:
   - **Backup & restore** — download one JSON file with your collection, play history, wishlist and Dictionary edits, or restore from one. Restore *replaces* everything, is all-or-nothing (a bad file changes nothing), and asks for confirmation first.
-  - **Refresh from BoardGameGeek** — re-fetches every BGG-linked game with progress and a Stop button. BGG's values win where it has one and Notes are replaced with BGG's description; ratings, plays and other personal fields are kept.
+  - **Refresh from BoardGameGeek** — re-fetches every BGG-linked game with progress and a Stop button (needs a `BGG_API_TOKEN`). BGG's values win where it has one and Notes are replaced with BGG's description; ratings, plays and other personal fields are kept.
   - **Preferences** (saved in this browser) — default Collection sort; what the Suggest page starts with (players, time, complexity); show/hide "New" badges.
   - **Dictionary housekeeping** — reset all your edits to the originals, or clear the "Not yet described" entries.
 - **Dark / light mode** — header button, persisted to `localStorage`, defaults to `prefers-color-scheme`.
