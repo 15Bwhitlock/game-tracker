@@ -6,10 +6,14 @@ import com.braydenwhitlock.gametracker.settings.AppSettingsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -28,7 +32,9 @@ class TagDescriptionServiceTest {
         repository = Mockito.mock(TagDescriptionRepository.class);
         anthropicClient = Mockito.mock(AnthropicClient.class);
         appSettingsService = Mockito.mock(AppSettingsService.class);
-        service = new TagDescriptionService(repository, anthropicClient, appSettingsService);
+        PlatformTransactionManager transactionManager = Mockito.mock(PlatformTransactionManager.class);
+        when(transactionManager.getTransaction(any())).thenReturn(Mockito.mock(TransactionStatus.class));
+        service = new TagDescriptionService(repository, anthropicClient, appSettingsService, transactionManager);
 
         // Default: AI on and configured — most tests care about the preset/existing-row
         // logic, not the toggle itself. Tests that care override this explicitly.
@@ -44,6 +50,7 @@ class TagDescriptionServiceTest {
 
         verify(anthropicClient, never()).describeTag(any(), any());
         verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -68,7 +75,7 @@ class TagDescriptionServiceTest {
 
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
-        verify(repository).save(org.mockito.ArgumentMatchers.argThat(tag ->
+        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
                 tag.getName().equals("Take That")
                         && tag.getType() == TagType.MECHANIC
                         && tag.getSource() == TagSource.AI
@@ -84,6 +91,7 @@ class TagDescriptionServiceTest {
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
         verify(repository, never()).save(any());
+        verify(repository, never()).saveAndFlush(any());
     }
 
     @Test
@@ -97,7 +105,7 @@ class TagDescriptionServiceTest {
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
         verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository).save(org.mockito.ArgumentMatchers.argThat(tag ->
+        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
                 tag.getName().equals("Take That")
                         && tag.getDescription() == null
                         && tag.getSource() == TagSource.PENDING));
@@ -112,8 +120,24 @@ class TagDescriptionServiceTest {
         service.ensureDescribed("Take That", TagType.MECHANIC);
 
         verify(anthropicClient, never()).describeTag(any(), any());
-        verify(repository).save(org.mockito.ArgumentMatchers.argThat(tag ->
+        verify(repository).saveAndFlush(org.mockito.ArgumentMatchers.argThat(tag ->
                 tag.getSource() == TagSource.PENDING));
+    }
+
+    @Test
+    void swallowsAUniqueConstraintViolationWhenTwoRequestsRaceToDescribeTheSameNewName() {
+        // Simulates the real bug this guards against: the Collection page's bulk-tag
+        // action can save several games with the same brand-new category concurrently.
+        // Both requests see "no existing row" and try to insert; the unique index on
+        // (lower(name), type) rejects the loser. That must never fail the caller's real
+        // work (e.g. GameService.update saving the game itself).
+        when(repository.findByNameIgnoreCaseAndType("Take That", TagType.MECHANIC))
+                .thenReturn(Optional.empty());
+        when(anthropicClient.describeTag("Take That", "mechanic"))
+                .thenReturn(Optional.of("Players can directly hinder or damage each other."));
+        when(repository.saveAndFlush(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        assertThatCode(() -> service.ensureDescribed("Take That", TagType.MECHANIC)).doesNotThrowAnyException();
     }
 
     @Test
