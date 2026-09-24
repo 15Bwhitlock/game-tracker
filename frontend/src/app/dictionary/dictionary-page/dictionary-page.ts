@@ -1,8 +1,10 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
-import { GAME_CATEGORIES, GAME_MECHANICS } from '@shared/models';
+import { AppSettingsApi, TagDescriptionApi } from '@shared/api';
+import { GAME_CATEGORIES, GAME_MECHANICS, TagDescription } from '@shared/models';
+import { describeHttpError } from '@shared/services';
 
 export interface ComplexityLevel {
   value: number;
@@ -38,7 +40,10 @@ export interface RatingTip {
   templateUrl: './dictionary-page.html',
   styleUrl: './dictionary-page.scss'
 })
-export class DictionaryPage {
+export class DictionaryPage implements OnInit {
+  private readonly api = inject(TagDescriptionApi);
+  private readonly settingsApi = inject(AppSettingsApi);
+
   readonly searchTerm = signal('');
 
   readonly complexityLevels: ComplexityLevel[] = [
@@ -156,4 +161,86 @@ export class DictionaryPage {
       m.name.toLowerCase().includes(term) || m.description.toLowerCase().includes(term)
     );
   });
+
+  // Categories/mechanics saved on a game or wishlist item that aren't in the curated
+  // preset lists above get an AI-written description the first time they're saved (see
+  // TagDescriptionService) — shown here, editable, kept separate from the curated lists
+  // since a preset description was hand-written and reviewed, this wasn't.
+  private readonly presetNames = new Set([...GAME_CATEGORIES, ...GAME_MECHANICS].map(t => t.name));
+  readonly learnedTags = signal<TagDescription[]>([]);
+  readonly loadError = signal<string | null>(null);
+
+  readonly filteredLearnedTags = computed(() => {
+    const term = this.searchTerm().trim().toLowerCase();
+    const tags = this.learnedTags().filter(t => !this.presetNames.has(t.name));
+    if (!term) return tags;
+    return tags.filter(t =>
+      t.name.toLowerCase().includes(term) || (t.description ?? '').toLowerCase().includes(term)
+    );
+  });
+
+  readonly editingTagId = signal<number | null>(null);
+  readonly editingTagValue = signal('');
+  readonly savingTag = signal(false);
+
+  // The value from BEFORE this page load — used to decide which entries are "New"
+  // for this render. Null means "never viewed before," which we treat as "everything
+  // is new" (a harmless one-time badge burst, not worth guarding against).
+  readonly dictionaryLastViewedAt = signal<string | null>(null);
+
+  isNewTag(tag: TagDescription): boolean {
+    const lastViewed = this.dictionaryLastViewedAt();
+    if (!lastViewed) return true;
+    return new Date(tag.createdAt) > new Date(lastViewed);
+  }
+
+  ngOnInit(): void {
+    this.api.list().subscribe({
+      next: tags => this.learnedTags.set(tags),
+      error: err => this.loadError.set(describeHttpError(err))
+    });
+    this.settingsApi.get().subscribe({
+      next: settings => {
+        this.dictionaryLastViewedAt.set(settings.dictionaryLastViewedAt);
+        // Reset for next time — fire-and-forget, this render already has the old value.
+        this.settingsApi.markDictionaryViewed().subscribe();
+      },
+      error: err => this.loadError.set(describeHttpError(err))
+    });
+  }
+
+  startEditTag(tag: TagDescription): void {
+    this.editingTagId.set(tag.id);
+    this.editingTagValue.set(tag.description ?? '');
+  }
+
+  cancelEditTag(): void {
+    this.editingTagId.set(null);
+    this.editingTagValue.set('');
+  }
+
+  saveTagDescription(tag: TagDescription): void {
+    const description = this.editingTagValue().trim();
+    if (!description) return;
+    this.savingTag.set(true);
+    this.api.updateDescription(tag.id, description).subscribe({
+      next: updated => {
+        this.learnedTags.update(list => list.map(t => t.id === updated.id ? updated : t));
+        this.editingTagId.set(null);
+        this.editingTagValue.set('');
+        this.savingTag.set(false);
+      },
+      error: err => {
+        this.loadError.set(describeHttpError(err));
+        this.savingTag.set(false);
+      }
+    });
+  }
+
+  removeTagDescription(tag: TagDescription): void {
+    this.api.remove(tag.id).subscribe({
+      next: () => this.learnedTags.update(list => list.filter(t => t.id !== tag.id)),
+      error: err => this.loadError.set(describeHttpError(err))
+    });
+  }
 }

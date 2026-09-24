@@ -2,6 +2,7 @@ package com.braydenwhitlock.gametracker.wishlist;
 
 import com.braydenwhitlock.gametracker.game.Game;
 import com.braydenwhitlock.gametracker.game.GameRepository;
+import com.braydenwhitlock.gametracker.tagdescription.TagDescriptionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -25,7 +26,7 @@ class WishlistServiceTest {
     void setUp() {
         wishlistRepo = Mockito.mock(WishlistRepository.class);
         gameRepo = Mockito.mock(GameRepository.class);
-        service = new WishlistService(wishlistRepo, gameRepo);
+        service = new WishlistService(wishlistRepo, gameRepo, Mockito.mock(TagDescriptionService.class));
     }
 
     @Test

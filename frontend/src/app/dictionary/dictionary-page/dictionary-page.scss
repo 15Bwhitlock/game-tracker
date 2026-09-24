@@ -106,6 +106,25 @@
   &:hover { text-decoration: underline; }
 }
 
+.entry__name-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.badge--new {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-text);
+  background: var(--accent-focus);
+  border-radius: 999px;
+  padding: 0.1rem 0.45rem;
+  line-height: 1.4;
+}
+
 .entry__desc {
   font-size: 0.88rem;
   color: var(--text-secondary);
@@ -115,6 +134,98 @@
 .muted {
   color: var(--text-muted);
   font-size: 0.9rem;
+}
+
+.entry__desc--pending {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.alert--error {
+  background: var(--error-bg);
+  color: var(--error-text);
+  border: 1px solid var(--error-border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:disabled { cursor: not-allowed; opacity: 0.6; }
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--border-input);
+  color: var(--text-dark);
+
+  &:hover:not(:disabled) { background: var(--bg-hover); }
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+
+  &:hover:not(:disabled) { background: var(--accent-hover); }
+}
+
+.btn--sm {
+  padding: 0.35rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+.btn--icon {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1;
+
+  &:hover { background: var(--bg-hover); color: var(--text-primary); }
+}
+
+.btn--icon-danger {
+  &:hover { background: var(--danger-bg-hover); color: var(--danger-text); }
+}
+
+.entry__edit {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+
+  textarea {
+    padding: 0.4rem 0.55rem;
+    border: 1px solid var(--border-input);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    font-family: inherit;
+    background: var(--bg-input);
+    color: var(--text-primary);
+    resize: vertical;
+  }
+}
+
+.entry__edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.4rem;
 }
 
 .complexity-grid {

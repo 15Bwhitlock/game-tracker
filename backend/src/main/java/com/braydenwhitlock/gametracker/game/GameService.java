@@ -1,5 +1,7 @@
 package com.braydenwhitlock.gametracker.game;
 
+import com.braydenwhitlock.gametracker.tagdescription.TagDescriptionService;
+import com.braydenwhitlock.gametracker.tagdescription.TagType;
 import jakarta.persistence.EntityManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,13 +31,27 @@ public class GameService {
     // undoPlay to force a flush + refresh so the returned Game has an accurate
     // playCount (which is a SQL @Formula, not a normal column).
     private final EntityManager entityManager;
+    private final TagDescriptionService tagDescriptionService;
 
     public GameService(GameRepository gameRepository,
                        GamePlayRepository playRepository,
-                       EntityManager entityManager) {
+                       EntityManager entityManager,
+                       TagDescriptionService tagDescriptionService) {
         this.gameRepository = gameRepository;
         this.playRepository = playRepository;
         this.entityManager = entityManager;
+        this.tagDescriptionService = tagDescriptionService;
+    }
+
+    // Called after every create/update so a genuinely new category/mechanic name gets an
+    // AI-written description the first time it's ever saved — see TagDescriptionService.
+    private void describeNewTags(Game game) {
+        for (String category : game.getCategories()) {
+            tagDescriptionService.ensureDescribed(category, TagType.CATEGORY);
+        }
+        for (String mechanic : game.getMechanics()) {
+            tagDescriptionService.ensureDescribed(mechanic, TagType.MECHANIC);
+        }
     }
 
     // readOnly = true tells the DB this query won't modify anything — small
@@ -56,7 +72,9 @@ public class GameService {
         // Clear the ID so the DB generates a fresh one — prevents a client
         // from forcing a specific ID or accidentally updating an existing game.
         game.setId(null);
-        return gameRepository.save(game);
+        Game saved = gameRepository.save(game);
+        describeNewTags(saved);
+        return saved;
     }
 
     /**
@@ -89,6 +107,7 @@ public class GameService {
         existing.setSeriesName(updates.getSeriesName());
         existing.setBasedOnBggId(updates.getBasedOnBggId());
         existing.setBasedOnGameName(updates.getBasedOnGameName());
+        describeNewTags(existing);
         // JPA dirty-checking detects the changed fields and issues an UPDATE
         // automatically when the transaction commits — no explicit save() needed here.
         return existing;

@@ -57,6 +57,13 @@ export const routes: Routes = [
       import('./dictionary/dictionary-page/dictionary-page').then((m) => m.DictionaryPage)
   },
 
+  // App-wide settings — currently just the AI-generated-descriptions toggle.
+  {
+    path: 'settings',
+    loadComponent: () =>
+      import('./settings/settings-page/settings-page').then((m) => m.SettingsPage)
+  },
+
   // Catch-all — must stay last. Anything not matched above (typo'd URL, stale
   // bookmark, deleted route) gets a real 404 page instead of a blank <main>.
   {

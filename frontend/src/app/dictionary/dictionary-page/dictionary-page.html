@@ -17,6 +17,10 @@
     </div>
   </header>
 
+  @if (loadError()) {
+    <div class="alert alert--error" role="alert">{{ loadError() }}</div>
+  }
+
   <!-- Complexity Scale -->
   @if (!searchTerm()) {
     <div class="card">
@@ -143,4 +147,61 @@
       </div>
     }
   </div>
+
+  <!-- From your collection — categories/mechanics not in the curated lists above,
+       auto-described by Claude the first time they were saved on a game or wishlist item. -->
+  @if (filteredLearnedTags().length > 0) {
+    <div class="card">
+      <h2 class="section-title">From Your Collection</h2>
+      <p class="section-subtitle">Categories and mechanics picked up from BGG that aren't in the curated lists above — described automatically, editable if it's wrong.</p>
+      <div class="entry-list">
+        @for (t of filteredLearnedTags(); track t.id) {
+          <div class="entry">
+            <div class="entry__name-wrap">
+              <a
+                class="entry__name entry__name--link"
+                [routerLink]="['/collection']"
+                [queryParams]="{ search: t.name }"
+                [title]="'View games in your collection tagged with this ' + (t.type === 'CATEGORY' ? 'category' : 'mechanic')"
+              >{{ t.name }}</a>
+              @if (isNewTag(t)) {
+                <span class="badge--new" title="Added since you last viewed the Dictionary">New</span>
+              }
+            </div>
+            @if (editingTagId() === t.id) {
+              <div class="entry__edit">
+                <textarea
+                  rows="2"
+                  [ngModel]="editingTagValue()"
+                  (ngModelChange)="editingTagValue.set($event)"
+                  [ngModelOptions]="{ standalone: true }"
+                ></textarea>
+                <div class="entry__edit-actions">
+                  <button type="button" class="btn btn--ghost btn--sm" [disabled]="savingTag()" (click)="cancelEditTag()">Cancel</button>
+                  <button type="button" class="btn btn--primary btn--sm" [disabled]="savingTag()" (click)="saveTagDescription(t)">
+                    {{ savingTag() ? 'Saving…' : 'Save' }}
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <span class="entry__desc">
+                @if (t.source === 'PENDING') {
+                  <span class="entry__desc--pending">Not yet described — AI generation is off, add one yourself.</span>
+                } @else {
+                  {{ t.description }}
+                }
+                <button
+                  type="button"
+                  class="btn--icon"
+                  [title]="t.source === 'PENDING' ? 'Add description' : 'Edit description'"
+                  (click)="startEditTag(t)"
+                >{{ t.source === 'PENDING' ? '➕' : '📝' }}</button>
+                <button type="button" class="btn--icon btn--icon-danger" title="Remove this entry" (click)="removeTagDescription(t)">✕</button>
+              </span>
+            }
+          </div>
+        }
+      </div>
+    </div>
+  }
 </section>

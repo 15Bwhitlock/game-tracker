@@ -1,6 +1,7 @@
 package com.braydenwhitlock.gametracker.config;
 
 import com.braydenwhitlock.gametracker.game.GameNotFoundException;
+import com.braydenwhitlock.gametracker.tagdescription.TagDescriptionNotFoundException;
 import com.braydenwhitlock.gametracker.wishlist.WishlistNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(WishlistNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(WishlistNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(new ErrorResponse(ex.getMessage()));
+    }
+
+    @ExceptionHandler(TagDescriptionNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(TagDescriptionNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(new ErrorResponse(ex.getMessage()));
     }
