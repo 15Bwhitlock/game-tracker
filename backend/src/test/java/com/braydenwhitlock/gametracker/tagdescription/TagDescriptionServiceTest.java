@@ -202,6 +202,34 @@ class TagDescriptionServiceTest {
     }
 
     @Test
+    void upsertOverrideCreatesAUserRowWhenNoneExists() {
+        when(repository.findByNameIgnoreCaseAndType("Strategy", TagType.CATEGORY)).thenReturn(Optional.empty());
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TagDescription saved = service.upsertOverride("Strategy", TagType.CATEGORY, "My take");
+
+        assertThat(saved.getName()).isEqualTo("Strategy");
+        assertThat(saved.getDescription()).isEqualTo("My take");
+        assertThat(saved.getSource()).isEqualTo(TagSource.USER);
+        assertThat(saved.getCreatedAt()).isNotNull();
+    }
+
+    @Test
+    void upsertOverrideUpdatesTheExistingRowInPlace() {
+        TagDescription existing = new TagDescription();
+        existing.setId(5L);
+        existing.setDescription("old");
+        existing.setSource(TagSource.USER);
+        when(repository.findByNameIgnoreCaseAndType("Strategy", TagType.CATEGORY)).thenReturn(Optional.of(existing));
+        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        TagDescription saved = service.upsertOverride("Strategy", TagType.CATEGORY, "new");
+
+        assertThat(saved.getId()).isEqualTo(5L);
+        assertThat(saved.getDescription()).isEqualTo("new");
+    }
+
+    @Test
     void deleteRemovesAnExistingRow() {
         when(repository.existsById(1L)).thenReturn(true);
 

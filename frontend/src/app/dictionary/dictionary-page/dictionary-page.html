@@ -95,7 +95,7 @@
         @for (g of filteredGlossary(); track g.term) {
           <div class="entry">
             <span class="entry__name">{{ g.term }}</span>
-            <span class="entry__desc">{{ g.definition }}</span>
+            <ng-container *ngTemplateOutlet="editable; context: { type: 'GLOSSARY', name: g.term, def: g.definition }" />
           </div>
         }
       </div>
@@ -118,7 +118,7 @@
               [queryParams]="{ search: cat.name }"
               title="View games in your collection tagged with this category"
             >{{ cat.name }}</a>
-            <span class="entry__desc">{{ cat.description }}</span>
+            <ng-container *ngTemplateOutlet="editable; context: { type: 'CATEGORY', name: cat.name, def: cat.description }" />
           </div>
         }
       </div>
@@ -141,7 +141,7 @@
               [queryParams]="{ search: m.name }"
               title="View games in your collection tagged with this mechanic"
             >{{ m.name }}</a>
-            <span class="entry__desc">{{ m.description }}</span>
+            <ng-container *ngTemplateOutlet="editable; context: { type: 'MECHANIC', name: m.name, def: m.description }" />
           </div>
         }
       </div>
@@ -204,4 +204,36 @@
       </div>
     </div>
   }
+
+  <!-- One entry's description cell for curated entries (presets and glossary terms): shows
+       the user's override if there is one, else the shipped default, with edit/revert. -->
+  <ng-template #editable let-type="type" let-name="name" let-def="def">
+    @if (editingKey() === keyOf(type, name)) {
+      <div class="entry__edit">
+        <textarea
+          rows="2"
+          [ngModel]="editingKeyValue()"
+          (ngModelChange)="editingKeyValue.set($event)"
+          [ngModelOptions]="{ standalone: true }"
+        ></textarea>
+        <div class="entry__edit-actions">
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="savingTag()" (click)="cancelEditPreset()">Cancel</button>
+          <button type="button" class="btn btn--primary btn--sm" [disabled]="savingTag()" (click)="saveOverride(type, name)">
+            {{ savingTag() ? 'Saving…' : 'Save' }}
+          </button>
+        </div>
+      </div>
+    } @else {
+      <span class="entry__desc">
+        {{ effective(type, name, def) }}
+        @if (overrideFor(type, name); as o) {
+          <span class="badge--edited" title="You've edited this — revert to see the original">edited</span>
+        }
+        <button type="button" class="btn--icon" title="Edit description" (click)="startEditPreset(type, name, effective(type, name, def))">📝</button>
+        @if (overrideFor(type, name); as o) {
+          <button type="button" class="btn--icon" title="Revert to the original description" (click)="revertOverride(o)">↩</button>
+        }
+      </span>
+    }
+  </ng-template>
 </section>

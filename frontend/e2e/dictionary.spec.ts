@@ -6,6 +6,7 @@ import {
   waitForTagDescription,
   deleteTagDescription,
   setAiEnabled,
+  deleteTagDescriptionByName,
   TagDescriptionRow
 } from './support/api';
 
@@ -176,4 +177,34 @@ test.describe('Dictionary page', () => {
       if (tag) await deleteTagDescription(request, tag.id);
     }
   });
+
+  for (const c of [
+    { label: 'category', type: 'CATEGORY' as const, name: 'Strategy', original: 'Long-term planning' },
+    { label: 'glossary term', type: 'GLOSSARY' as const, name: 'Filler', original: 'short (15–30 min) game' }
+  ]) {
+    test(`lets you edit a curated ${c.label}, keeps it after reload, and reverts to the original`, async ({ page, request }) => {
+      const edited = `My own take on ${c.name}.`;
+      try {
+        await page.goto('/dictionary');
+        const row = page.locator('.entry', { has: page.locator('.entry__name', { hasText: new RegExp(`^${c.name}$`) }) });
+        await expect(row.locator('.entry__desc')).toContainText(c.original);
+        await expect(row.locator('.badge--edited')).not.toBeVisible();
+
+        await row.getByTitle('Edit description').click();
+        await row.locator('textarea').fill(edited);
+        await row.getByRole('button', { name: 'Save' }).click();
+        await expect(row.locator('.entry__desc')).toContainText(edited);
+        await expect(row.locator('.badge--edited')).toBeVisible();
+
+        await page.reload();
+        await expect(row.locator('.entry__desc')).toContainText(edited);
+
+        await row.getByTitle('Revert to the original description').click();
+        await expect(row.locator('.entry__desc')).toContainText(c.original);
+        await expect(row.locator('.badge--edited')).not.toBeVisible();
+      } finally {
+        await deleteTagDescriptionByName(request, c.name, c.type);
+      }
+    });
+  }
 });

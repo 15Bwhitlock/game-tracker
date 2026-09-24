@@ -164,7 +164,7 @@ export async function deleteAllE2eWishlistItems(request: APIRequestContext): Pro
 export interface TagDescriptionRow {
   id: number;
   name: string;
-  type: 'CATEGORY' | 'MECHANIC';
+  type: 'CATEGORY' | 'MECHANIC' | 'GLOSSARY';
   description: string;
   source: 'AI' | 'USER';
 }
@@ -213,4 +213,17 @@ export async function getAiEnabled(request: APIRequestContext): Promise<boolean>
 export async function setAiEnabled(request: APIRequestContext, aiEnabled: boolean): Promise<void> {
   const response = await request.patch('/api/settings', { data: { aiEnabled } });
   expect(response.ok(), `setAiEnabled failed: ${response.status()} ${await response.text()}`).toBeTruthy();
+}
+
+/** Removes any override row for a curated entry (by name+type); safety net for override tests. */
+export async function deleteTagDescriptionByName(
+  request: APIRequestContext,
+  name: string,
+  type: 'CATEGORY' | 'MECHANIC' | 'GLOSSARY'
+): Promise<void> {
+  const response = await request.get('/api/tag-descriptions');
+  expect(response.ok()).toBeTruthy();
+  const rows = (await response.json()) as TagDescriptionRow[];
+  const match = rows.find((r) => r.type === type && r.name.toLowerCase() === name.toLowerCase());
+  if (match) await deleteTagDescription(request, match.id);
 }

@@ -135,6 +135,24 @@ public class TagDescriptionService {
         return repository.save(tag);
     }
 
+    /**
+     * Creates or updates the user's override of a curated entry (a preset category or
+     * mechanic, or a glossary term) — the static default lives in the frontend, so the
+     * first edit has no row yet. Always marked USER; deleting the row reverts to the default.
+     */
+    public TagDescription upsertOverride(String name, TagType type, String description) {
+        TagDescription tag = repository.findByNameIgnoreCaseAndType(name, type).orElseGet(() -> {
+            TagDescription created = new TagDescription();
+            created.setName(name);
+            created.setType(type);
+            created.setCreatedAt(Instant.now());
+            return created;
+        });
+        tag.setDescription(description);
+        tag.setSource(TagSource.USER);
+        return repository.save(tag);
+    }
+
     public void delete(Long id) {
         if (!repository.existsById(id)) {
             throw new TagDescriptionNotFoundException(id);
