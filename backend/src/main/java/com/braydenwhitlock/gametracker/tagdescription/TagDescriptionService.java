@@ -1,7 +1,5 @@
 package com.braydenwhitlock.gametracker.tagdescription;
 
-import com.braydenwhitlock.gametracker.ai.AnthropicClient;
-import com.braydenwhitlock.gametracker.settings.AppSettingsService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -13,7 +11,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 @Service
@@ -23,19 +20,13 @@ public class TagDescriptionService {
     private static final Logger log = LoggerFactory.getLogger(TagDescriptionService.class);
 
     private final TagDescriptionRepository repository;
-    private final AnthropicClient anthropicClient;
-    private final AppSettingsService appSettingsService;
     private final TransactionTemplate requiresNewTransaction;
 
     public TagDescriptionService(
             TagDescriptionRepository repository,
-            AnthropicClient anthropicClient,
-            AppSettingsService appSettingsService,
             PlatformTransactionManager transactionManager
     ) {
         this.repository = repository;
-        this.anthropicClient = anthropicClient;
-        this.appSettingsService = appSettingsService;
         this.requiresNewTransaction = new TransactionTemplate(transactionManager);
         this.requiresNewTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -46,52 +37,19 @@ public class TagDescriptionService {
     }
 
     /**
-     * If {@code name} is already a curated preset, does nothing. Otherwise:
-     * <ul>
-     *   <li>no existing row, AI available — asks Claude to write one and saves it only on
-     *       a successful (non-empty) response, so a transient failure just means "try
-     *       again the next time this name is saved," never a permanently blank row.</li>
-     *   <li>no existing row, AI unavailable (toggled off in settings, or no
-     *       {@code ANTHROPIC_API_KEY} configured) — saves a PENDING placeholder with no
-     *       description, so the name still shows up on the Dictionary page for the user
-     *       to describe manually.</li>
-     *   <li>existing PENDING row, AI now available — backfills it via Claude, same as a
-     *       new name (covers "I turned AI on after opting out for a while").</li>
-     *   <li>existing row with a description (AI- or user-written) — does nothing.</li>
-     * </ul>
+     * Makes sure a category/mechanic name that isn't a curated preset has a row, so it
+     * shows up on the Dictionary page as "Not yet described" for the user to fill in.
+     * Does nothing for presets or names that already have a row.
      */
     public void ensureDescribed(String name, TagType type) {
         if (name == null || name.isBlank()) {
             return;
         }
         Set<String> presets = type == TagType.CATEGORY ? PresetTagNames.CATEGORIES : PresetTagNames.MECHANICS;
-        if (presets.contains(name)) {
+        if (presets.contains(name) || repository.findByNameIgnoreCaseAndType(name, type).isPresent()) {
             return;
         }
-
-        Optional<TagDescription> existing = repository.findByNameIgnoreCaseAndType(name, type);
-        if (existing.isPresent()) {
-            TagDescription tag = existing.get();
-            if (isBlank(tag.getDescription()) && aiAvailable()) {
-                anthropicClient.describeTag(name, kindLabel(type)).ifPresent(description -> {
-                    tag.setDescription(description);
-                    tag.setSource(TagSource.AI);
-                    repository.save(tag);
-                });
-            }
-            return;
-        }
-
-        if (aiAvailable()) {
-            anthropicClient.describeTag(name, kindLabel(type))
-                    .ifPresent(description -> save(name, type, description, TagSource.AI));
-        } else {
-            save(name, type, null, TagSource.PENDING);
-        }
-    }
-
-    private boolean aiAvailable() {
-        return appSettingsService.get().isAiEnabled() && anthropicClient.isConfigured();
+        save(name, type);
     }
 
     /**
@@ -104,28 +62,19 @@ public class TagDescriptionService {
      * here — a lost race is a no-op, not a reason to fail the caller's real work (e.g.
      * saving a game) — instead of poisoning the caller's own transaction.
      */
-    private void save(String name, TagType type, String description, TagSource source) {
+    private void save(String name, TagType type) {
         try {
             requiresNewTransaction.executeWithoutResult(status -> {
                 TagDescription tag = new TagDescription();
                 tag.setName(name);
                 tag.setType(type);
-                tag.setDescription(description);
-                tag.setSource(source);
+                tag.setSource(TagSource.PENDING);
                 tag.setCreatedAt(Instant.now());
                 repository.saveAndFlush(tag);
             });
         } catch (DataIntegrityViolationException e) {
             log.debug("Lost the race to describe '{}' ({}) — another request already created it.", name, type);
         }
-    }
-
-    private static boolean isBlank(String s) {
-        return s == null || s.isBlank();
-    }
-
-    private static String kindLabel(TagType type) {
-        return type == TagType.CATEGORY ? "category" : "mechanic";
     }
 
     public TagDescription updateDescription(Long id, String description) {
@@ -151,6 +100,29 @@ public class TagDescriptionService {
         tag.setDescription(description);
         tag.setSource(TagSource.USER);
         return repository.save(tag);
+    }
+
+    /** Removes every "Not yet described" placeholder; they reappear when a game with that name is next saved. */
+    public int deletePending() {
+        List<TagDescription> rows = repository.findAll().stream()
+                .filter(t -> t.getSource() == TagSource.PENDING).toList();
+        repository.deleteAll(rows);
+        return rows.size();
+    }
+
+    /** Removes the user's edits of curated entries (presets and glossary terms), restoring the shipped text. */
+    public int deleteOverrides() {
+        List<TagDescription> rows = repository.findAll().stream().filter(this::isOverride).toList();
+        repository.deleteAll(rows);
+        return rows.size();
+    }
+
+    private boolean isOverride(TagDescription t) {
+        if (t.getType() == TagType.GLOSSARY) {
+            return true;
+        }
+        Set<String> presets = t.getType() == TagType.CATEGORY ? PresetTagNames.CATEGORIES : PresetTagNames.MECHANICS;
+        return presets.stream().anyMatch(p -> p.equalsIgnoreCase(t.getName()));
     }
 
     public void delete(Long id) {

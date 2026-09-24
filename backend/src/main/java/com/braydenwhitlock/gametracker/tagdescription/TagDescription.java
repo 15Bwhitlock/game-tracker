@@ -12,10 +12,8 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 
 /**
- * A one-sentence explanation of a category or mechanic name that isn't in the app's
- * curated preset list (see frontend's GAME_CATEGORIES/GAME_MECHANICS) — written by
- * Claude the first time the name is saved on a game or wishlist item, and editable by
- * the user afterward (see {@link TagSource}).
+ * The user's own explanation of a category, mechanic or glossary term: either a name that
+ * isn't in the curated preset list (PENDING until described), or an edit of a curated entry.
  */
 @Entity
 @Table(name = "tag_descriptions")
@@ -32,8 +30,7 @@ public class TagDescription {
     @Column(nullable = false)
     private TagType type;
 
-    // Null while PENDING (see TagSource) — a placeholder waiting on a manual description
-    // because AI generation was unavailable when this name was first saved.
+    // Null while PENDING (see TagSource) — a placeholder waiting for the user to describe it.
     @Column(columnDefinition = "TEXT")
     private String description;
 

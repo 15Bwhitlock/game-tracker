@@ -24,7 +24,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/tag-descriptions")
-@Tag(name = "Tag Descriptions", description = "AI-written explanations of categories/mechanics not in the curated preset list")
+@Tag(name = "Tag Descriptions", description = "User-written explanations of categories/mechanics not in the curated preset list, plus edits to curated entries")
 public class TagDescriptionController {
 
     private final TagDescriptionService service;
@@ -63,6 +63,18 @@ public class TagDescriptionController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "type must be CATEGORY, MECHANIC or GLOSSARY");
         }
         return service.upsertOverride(name.trim(), tagType, description.trim());
+    }
+
+    @Operation(summary = "Remove every \"Not yet described\" placeholder")
+    @DeleteMapping("/pending")
+    public Map<String, Integer> deletePending() {
+        return Map.of("deleted", service.deletePending());
+    }
+
+    @Operation(summary = "Restore all curated entries to their shipped descriptions")
+    @DeleteMapping("/overrides")
+    public Map<String, Integer> deleteOverrides() {
+        return Map.of("deleted", service.deleteOverrides());
     }
 
     @Operation(summary = "Remove a tag description (e.g. a bad AI guess)")

@@ -5,7 +5,7 @@ import { forkJoin } from 'rxjs';
 
 import { GameApi, GamePlay } from '@shared/api';
 import { Game, PLAYERS_UNLIMITED, TIME_UNLIMITED } from '@shared/models';
-import { ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
+import { PreferencesService, SORT_OPTIONS, SortKey, ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
 
 @Component({
   selector: 'app-game-list',
@@ -60,17 +60,10 @@ export class GameList implements OnInit {
   readonly PLAYERS_UNLIMITED = PLAYERS_UNLIMITED;
   readonly TIME_UNLIMITED = TIME_UNLIMITED;
 
-  readonly sortOptions: { key: SortKey; label: string }[] = [
-    { key: 'title-asc',      label: 'Title (A–Z)' },
-    { key: 'title-desc',     label: 'Title (Z–A)' },
-    { key: 'favorites',      label: 'Favorites first' },
-    { key: 'plays-desc',     label: 'Most played' },
-    { key: 'plays-asc',      label: 'Least played' },
-    { key: 'last-played',    label: 'Recently played' },
-    { key: 'rating-desc',    label: 'Highest rated' },
-  ];
+  readonly sortOptions = SORT_OPTIONS;
 
-  readonly sortKey = signal<SortKey>('title-asc');
+  private readonly preferences = inject(PreferencesService);
+  readonly sortKey = signal<SortKey>(this.preferences.prefs().collectionSort);
   readonly sortOpen = signal(false);
 
   // Persisted like ThemeService's dark-mode choice — a per-viewer display preference,
@@ -423,7 +416,6 @@ export class GameList implements OnInit {
   }
 }
 
-type SortKey = 'title-asc' | 'title-desc' | 'favorites' | 'plays-desc' | 'plays-asc' | 'last-played' | 'rating-desc';
 type ViewMode = 'list' | 'grid';
 type BggFilter = 'all' | 'linked' | 'unlinked';
 

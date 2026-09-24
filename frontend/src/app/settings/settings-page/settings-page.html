@@ -7,25 +7,123 @@
     <div class="alert alert--error" role="alert">{{ error() }}</div>
   }
 
-  @if (!loading()) {
-    <div class="card">
-      <h2 class="section-title">AI Features</h2>
-      <p class="section-subtitle">
-        When you save a category or mechanic that isn't in the curated Dictionary list,
-        Claude writes a one-sentence description for it automatically. Turn this off to
-        write those descriptions yourself instead — new entries still show up on the
-        Dictionary page's "From Your Collection" section, just waiting for you to fill
-        them in.
-      </p>
+  <!-- Display preferences -->
+  <div class="card">
+    <h2 class="section-title">Preferences</h2>
+    <p class="section-subtitle">Remembered in this browser. The light/dark button stays in the header.</p>
+
+    <div class="fields">
+      <label class="field">
+        <span>Collection sorts by</span>
+        <select id="pref-sort" [ngModel]="prefs().collectionSort" (ngModelChange)="setPref('collectionSort', $event)" [ngModelOptions]="{ standalone: true }">
+          @for (opt of sortOptions; track opt.key) {
+            <option [ngValue]="opt.key">{{ opt.label }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Suggest starts with players</span>
+        <select id="pref-players" [ngModel]="prefs().suggestPlayers" (ngModelChange)="setPref('suggestPlayers', $event)" [ngModelOptions]="{ standalone: true }">
+          <option [ngValue]="null">No default</option>
+          @for (n of playerOptions; track n) {
+            <option [ngValue]="n">{{ n === PLAYERS_UNLIMITED ? '10+' : n }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Suggest starts with time up to</span>
+        <select id="pref-time" [ngModel]="prefs().suggestMaxMinutes" (ngModelChange)="setPref('suggestMaxMinutes', $event)" [ngModelOptions]="{ standalone: true }">
+          <option [ngValue]="null">No default</option>
+          @for (t of timeOptions; track t) {
+            <option [ngValue]="t">{{ t === TIME_UNLIMITED ? '4h+' : formatTime(t) }}</option>
+          }
+        </select>
+      </label>
+
+      <label class="field">
+        <span>Suggest starts with complexity up to</span>
+        <select id="pref-complexity" [ngModel]="prefs().suggestMaxComplexity" (ngModelChange)="setPref('suggestMaxComplexity', $event)" [ngModelOptions]="{ standalone: true }">
+          <option [ngValue]="null">No default</option>
+          @for (c of complexityOptions; track c) {
+            <option [ngValue]="c">{{ complexityLabels[c] }}</option>
+          }
+        </select>
+      </label>
+
       <label class="toggle-row">
-        <input
-          type="checkbox"
-          [checked]="aiEnabled()"
-          [disabled]="saving()"
-          (change)="toggleAi()"
-        />
-        <span>Auto-write category/mechanic descriptions with AI</span>
+        <input id="pref-new-badges" type="checkbox" [checked]="prefs().showNewBadges" (change)="setPref('showNewBadges', !prefs().showNewBadges)" />
+        <span>Show "New" badges on Dictionary entries</span>
       </label>
     </div>
-  }
+
+    <div class="actions">
+      <button type="button" class="btn btn--ghost btn--sm" (click)="resetPrefs()">Reset preferences</button>
+    </div>
+  </div>
+
+  <!-- Backup & restore -->
+  <div class="card">
+    <h2 class="section-title">Backup &amp; restore</h2>
+    <p class="section-subtitle">Everything in one file: your collection, play history, wishlist and Dictionary edits. Restoring <strong>replaces</strong> everything currently in the app.</p>
+
+    <div class="actions">
+      <button type="button" class="btn btn--primary" [disabled]="backupBusy()" (click)="downloadBackup()">Download backup</button>
+      <label class="btn btn--ghost file-btn" [class.disabled]="backupBusy()">
+        Restore from file…
+        <input id="restore-file" type="file" accept="application/json,.json" [disabled]="backupBusy()" (change)="chooseRestoreFile($event)" hidden />
+      </label>
+    </div>
+
+    @if (pendingRestore()) {
+      <div class="confirm" role="alertdialog" aria-label="Confirm restore">
+        <p>Replace everything in the app with this backup ({{ pendingRestoreSummary() }})? This can't be undone — download a backup first if you're unsure.</p>
+        <div class="actions">
+          <button type="button" class="btn btn--ghost btn--sm" [disabled]="backupBusy()" (click)="cancelRestore()">Cancel</button>
+          <button type="button" class="btn btn--danger btn--sm" [disabled]="backupBusy()" (click)="confirmRestore()">Replace everything</button>
+        </div>
+      </div>
+    }
+    @if (backupMessage()) {
+      <p class="status">{{ backupMessage() }}</p>
+    }
+  </div>
+
+  <!-- BGG refresh -->
+  <div class="card">
+    <h2 class="section-title">Refresh from BoardGameGeek</h2>
+    <p class="section-subtitle">Re-fetches details for every game linked to BoardGameGeek. BGG's values win where it has one, and each game's Notes are replaced with BGG's description. Your ratings, plays and other personal fields are kept.</p>
+
+    <div class="actions">
+      <button type="button" class="btn btn--primary" [disabled]="refreshing()" (click)="refreshAllFromBgg()">
+        {{ refreshing() ? 'Refreshing…' : 'Refresh all games' }}
+      </button>
+      @if (refreshing()) {
+        <button type="button" class="btn btn--ghost btn--sm" (click)="stopRefresh()">Stop</button>
+        <span class="status">{{ refreshDone() }} / {{ refreshTotal() }}</span>
+      }
+    </div>
+    @if (refreshMessage()) {
+      <p class="status">{{ refreshMessage() }}</p>
+    }
+    @if (refreshFailures().length > 0) {
+      <p class="status status--warn">Couldn't refresh: {{ refreshFailures().join(', ') }}</p>
+    }
+  </div>
+
+  <!-- Dictionary housekeeping -->
+  <div class="card">
+    <h2 class="section-title">Dictionary housekeeping</h2>
+    <p class="section-subtitle">Tidy up the Dictionary page.</p>
+
+    <div class="actions">
+      <button type="button" class="btn btn--ghost" (click)="resetEdits()">Reset all my edits to the originals</button>
+      <button type="button" class="btn btn--ghost" (click)="clearPending()">Clear "Not yet described" entries</button>
+    </div>
+    @if (dictionaryMessage()) {
+      <p class="status">{{ dictionaryMessage() }}</p>
+    }
+    <p class="hint">Cleared entries come back the next time a game with that category or mechanic is saved.</p>
+  </div>
 </section>

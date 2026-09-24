@@ -26,14 +26,6 @@ bgg:
   # BGG_API_TOKEN in your shell before starting the backend. Never commit a real token here.
   api-token: ${BGG_API_TOKEN:}
 
-anthropic:
-  # Used to auto-write a one-sentence description for a category/mechanic the first time
-  # it's saved and isn't already described (see TagDescriptionService). Get a key at
-  # console.anthropic.com, then export ANTHROPIC_API_KEY in your shell before starting the
-  # backend. Never commit a real key here. Without one, this feature no-ops — the app is
-  # unaffected otherwise.
-  api-key: ${ANTHROPIC_API_KEY:}
-
 logging:
   level:
     com.braydenwhitlock.gametracker: DEBUG

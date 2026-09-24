@@ -3,7 +3,7 @@ import { Component, ElementRef, OnInit, computed, effect, inject, signal, untrac
 import { RouterLink } from '@angular/router';
 
 import { SuggestionApi, GameApi, GamePlay } from '@shared/api';
-import { ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
+import { PreferencesService, ToastService, describeHttpError, formatTime, formatDate, formatPlayers } from '@shared/services';
 import { Game, ScoredGame, SuggestionCriteria, SuggestionPage, GAME_CATEGORIES, GAME_MECHANICS, PLAYER_OPTIONS, PLAYERS_UNLIMITED, TIME_OPTIONS, TIME_UNLIMITED, COMPLEXITY_OPTIONS, COMPLEXITY_LABELS, RATING_OPTIONS } from '@shared/models';
 
 @Component({
@@ -19,13 +19,16 @@ export class SuggestPage implements OnInit {
   private readonly gameApi = inject(GameApi);
   private readonly toast = inject(ToastService);
 
+  // Starting values come from the Settings page's "Suggest defaults" (all optional).
+  private readonly preferences = inject(PreferencesService);
+
   readonly draft = signal<SuggestionCriteria>({
-    minPlayers: null,
+    minPlayers: this.preferences.prefs().suggestPlayers,
     maxPlayers: null,
     minMinutes: null,
-    maxMinutes: null,
-    minComplexity: null,
-    maxComplexity: null,
+    maxMinutes: this.preferences.prefs().suggestMaxMinutes,
+    minComplexity: this.preferences.prefs().suggestMaxComplexity == null ? null : 1,
+    maxComplexity: this.preferences.prefs().suggestMaxComplexity,
     categories: null,
     mechanics: null,
     series: null,

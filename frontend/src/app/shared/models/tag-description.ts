@@ -6,6 +6,6 @@ export interface TagDescription {
   // Null when source is PENDING — AI was unavailable when this name was first saved,
   // and no one has written a description yet.
   description: string | null;
-  source: 'AI' | 'USER' | 'PENDING';
+  source: 'USER' | 'PENDING';
   createdAt: string;
 }

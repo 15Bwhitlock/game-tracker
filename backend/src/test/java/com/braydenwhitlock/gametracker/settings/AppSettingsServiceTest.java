@@ -27,7 +27,6 @@ class AppSettingsServiceTest {
     void getReturnsTheSeededRow() {
         AppSettings settings = new AppSettings();
         settings.setId(1L);
-        settings.setAiEnabled(true);
         when(repository.findById(1L)).thenReturn(Optional.of(settings));
 
         assertThat(service.get()).isSameAs(settings);
@@ -38,19 +37,6 @@ class AppSettingsServiceTest {
         when(repository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get()).isInstanceOf(IllegalStateException.class);
-    }
-
-    @Test
-    void updateAiEnabledFlipsAndSavesTheFlag() {
-        AppSettings settings = new AppSettings();
-        settings.setId(1L);
-        settings.setAiEnabled(true);
-        when(repository.findById(1L)).thenReturn(Optional.of(settings));
-        when(repository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-
-        AppSettings updated = service.updateAiEnabled(false);
-
-        assertThat(updated.isAiEnabled()).isFalse();
     }
 
     @Test

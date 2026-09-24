@@ -25,6 +25,14 @@ export class TagDescriptionApi {
     return this.http.put<TagDescription>(`${this.baseUrl}/override`, { name, type, description });
   }
 
+  deletePending(): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>(`${this.baseUrl}/pending`);
+  }
+
+  deleteOverrides(): Observable<{ deleted: number }> {
+    return this.http.delete<{ deleted: number }>(`${this.baseUrl}/overrides`);
+  }
+
   remove(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
   }
