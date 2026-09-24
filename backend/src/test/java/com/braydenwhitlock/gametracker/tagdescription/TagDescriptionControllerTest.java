@@ -65,6 +65,33 @@ class TagDescriptionControllerTest {
     }
 
     @Test
+    void overrideUpsertsAndReturnsTheRow() throws Exception {
+        TagDescription saved = sampleTag();
+        saved.setName("Strategy");
+        saved.setType(TagType.CATEGORY);
+        saved.setSource(TagSource.USER);
+        when(service.upsertOverride("Strategy", TagType.CATEGORY, "My take")).thenReturn(saved);
+
+        mvc.perform(put("/api/tag-descriptions/override")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Strategy\",\"type\":\"CATEGORY\",\"description\":\"My take\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.source").value("USER"));
+    }
+
+    @Test
+    void overrideRejectsABlankDescriptionOrUnknownType() throws Exception {
+        mvc.perform(put("/api/tag-descriptions/override")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Strategy\",\"type\":\"CATEGORY\",\"description\":\"  \"}"))
+                .andExpect(status().isBadRequest());
+        mvc.perform(put("/api/tag-descriptions/override")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Strategy\",\"type\":\"NOPE\",\"description\":\"x\"}"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void deleteReturns204() throws Exception {
         doNothing().when(service).delete(1L);
 

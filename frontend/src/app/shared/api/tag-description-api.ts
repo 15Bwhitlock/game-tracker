@@ -20,6 +20,11 @@ export class TagDescriptionApi {
     return this.http.patch<TagDescription>(`${this.baseUrl}/${id}`, { description });
   }
 
+  /** Creates or updates the user's override of a curated (preset/glossary) entry. */
+  override(name: string, type: TagDescription['type'], description: string): Observable<TagDescription> {
+    return this.http.put<TagDescription>(`${this.baseUrl}/override`, { name, type, description });
+  }
+
   remove(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
   }

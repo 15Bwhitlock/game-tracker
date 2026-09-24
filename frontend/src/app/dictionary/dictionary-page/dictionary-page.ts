@@ -1,4 +1,5 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 
@@ -36,7 +37,7 @@ export interface RatingTip {
 
 @Component({
   selector: 'app-dictionary-page',
-  imports: [FormsModule, RouterLink],
+  imports: [FormsModule, NgTemplateOutlet, RouterLink],
   templateUrl: './dictionary-page.html',
   styleUrl: './dictionary-page.scss'
 })
@@ -142,7 +143,8 @@ export class DictionaryPage implements OnInit {
     const term = this.searchTerm().trim().toLowerCase();
     if (!term) return this.glossaryTerms;
     return this.glossaryTerms.filter(g =>
-      g.term.toLowerCase().includes(term) || g.definition.toLowerCase().includes(term)
+      g.term.toLowerCase().includes(term) ||
+      this.effective('GLOSSARY', g.term, g.definition).toLowerCase().includes(term)
     );
   });
 
@@ -150,7 +152,8 @@ export class DictionaryPage implements OnInit {
     const term = this.searchTerm().trim().toLowerCase();
     if (!term) return GAME_CATEGORIES;
     return GAME_CATEGORIES.filter(c =>
-      c.name.toLowerCase().includes(term) || c.description.toLowerCase().includes(term)
+      c.name.toLowerCase().includes(term) ||
+      this.effective('CATEGORY', c.name, c.description).toLowerCase().includes(term)
     );
   });
 
@@ -158,7 +161,8 @@ export class DictionaryPage implements OnInit {
     const term = this.searchTerm().trim().toLowerCase();
     if (!term) return GAME_MECHANICS;
     return GAME_MECHANICS.filter(m =>
-      m.name.toLowerCase().includes(term) || m.description.toLowerCase().includes(term)
+      m.name.toLowerCase().includes(term) ||
+      this.effective('MECHANIC', m.name, m.description).toLowerCase().includes(term)
     );
   });
 
@@ -172,12 +176,70 @@ export class DictionaryPage implements OnInit {
 
   readonly filteredLearnedTags = computed(() => {
     const term = this.searchTerm().trim().toLowerCase();
-    const tags = this.learnedTags().filter(t => !this.presetNames.has(t.name));
+    const tags = this.learnedTags().filter(t => t.type !== 'GLOSSARY' && !this.presetNames.has(t.name));
     if (!term) return tags;
     return tags.filter(t =>
       t.name.toLowerCase().includes(term) || (t.description ?? '').toLowerCase().includes(term)
     );
   });
+
+  // User edits of curated entries (presets and glossary terms) live in the same table as
+  // learned tags; the static default stays in this file and an override, when present, wins.
+  private readonly overrides = computed(() => {
+    const map = new Map<string, TagDescription>();
+    for (const t of this.learnedTags()) map.set(this.keyOf(t.type, t.name), t);
+    return map;
+  });
+
+  keyOf(type: string, name: string): string {
+    return `${type}:${name.toLowerCase()}`;
+  }
+
+  overrideFor(type: string, name: string): TagDescription | undefined {
+    const row = this.overrides().get(this.keyOf(type, name));
+    return row && row.description ? row : undefined;
+  }
+
+  effective(type: string, name: string, fallback: string): string {
+    return this.overrideFor(type, name)?.description ?? fallback;
+  }
+
+  readonly editingKey = signal<string | null>(null);
+  readonly editingKeyValue = signal('');
+
+  startEditPreset(type: string, name: string, current: string): void {
+    this.editingKey.set(this.keyOf(type, name));
+    this.editingKeyValue.set(current);
+  }
+
+  cancelEditPreset(): void {
+    this.editingKey.set(null);
+    this.editingKeyValue.set('');
+  }
+
+  saveOverride(type: TagDescription['type'], name: string): void {
+    const description = this.editingKeyValue().trim();
+    if (!description) return;
+    this.savingTag.set(true);
+    this.api.override(name, type, description).subscribe({
+      next: saved => {
+        this.learnedTags.update(list => [...list.filter(t => t.id !== saved.id), saved]);
+        this.cancelEditPreset();
+        this.savingTag.set(false);
+      },
+      error: err => {
+        this.loadError.set(describeHttpError(err));
+        this.savingTag.set(false);
+      }
+    });
+  }
+
+  revertOverride(row: TagDescription): void {
+    this.api.remove(row.id).subscribe({
+      next: () => this.learnedTags.update(list => list.filter(t => t.id !== row.id)),
+      error: err => this.loadError.set(describeHttpError(err))
+    });
+  }
 
   readonly editingTagId = signal<number | null>(null);
   readonly editingTagValue = signal('');
